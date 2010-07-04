@@ -1,16 +1,13 @@
 This is a fork and improvement of the wxHTML implementation from
 wxWidgets.
 
-The code makes use a library from the Open Source project called
-Emdros:
+Its input must be something akin to XHTML (but not quite).  That is,
+the code unfortunately doesn't follow any standard for HTML.
 
-http://emdros.org
+The code is self-contained, and needs no other dependencies than
+wxWidgets (2.8.X) and its dependencies.
 
-To be precise, it makes use of the libemdf.a library from that
-project, and only a small subset of that library is used, namely the
-qdxml.cpp file.
-
-The code is licensed under the wxWidgets license version 3.0.
+The code is licensed under the wxWidgets license version 3.1.
 
 Questions, comments, etc. about this code should be directed to me,
 Ulrik Sandborg-Petersen, not to the wxWidgets team.
