@@ -4,6 +4,11 @@ wxWidgets.
 Its input must be something akin to XHTML (but not quite).  That is,
 the code unfortunately doesn't follow any standard for HTML.
 
+For how to use the API, please see the wxHTML documentation at the
+wxWidgets site, <http://www.wxwidgets.org>.
+
+For what (X)HTML the code accepts, please see the code.
+
 The code is self-contained, and needs no other dependencies than
 wxWidgets (2.8.X) and its dependencies.
 
