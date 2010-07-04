@@ -14,6 +14,10 @@ wxWidgets (2.8.X) and its dependencies.
 
 The code is licensed under the wxWidgets license version 3.1.
 
+The name, wxMunkHTML, derives from the fact that it was originally
+prepared for use in a project on the Danish playwright, pastor, poet,
+and author, Kaj Munk.
+
 Questions, comments, etc. about this code should be directed to me,
 Ulrik Sandborg-Petersen, not to the wxWidgets team.
 
