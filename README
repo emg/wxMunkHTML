@@ -1,0 +1,21 @@
+This is a fork and improvement of the wxHTML implementation from
+wxWidgets.
+
+The code makes use a library from the Open Source project called
+Emdros:
+
+http://emdros.org
+
+To be precise, it makes use of the libemdf.a library from that
+project, and only a small subset of that library is used, namely the
+qdxml.cpp file.
+
+The code is licensed under the wxWidgets license version 3.0.
+
+Questions, comments, etc. about this code should be directed to me,
+Ulrik Sandborg-Petersen, not to the wxWidgets team.
+
+Enjoy!
+
+Ulrik Sandborg-Petersen
+ulrikp a emdros o org
