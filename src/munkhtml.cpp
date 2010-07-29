@@ -1898,6 +1898,7 @@ public:
 	virtual MunkHtmlLinkInfo *GetLink(int x = 0, int y = 0) const;
 	
 	void SetImage(const wxImage& img);
+	void SetDescent(int descent);
 
 private:
 	wxBitmap           *m_bitmap;
@@ -1984,6 +1985,11 @@ MunkHtmlImageCell::MunkHtmlImageCell(MunkHtmlWindowInterface *windowIface,
             break;
     }
  }
+
+void MunkHtmlImageCell::SetDescent(int descent)
+{
+	m_Descent = descent;
+}
 
 void MunkHtmlImageCell::SetImage(const wxImage& img)
 {
@@ -6586,6 +6592,13 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 					  1.0, // Pixel scale
                                           al, mn);
 			ApplyStateToCell(cel);
+			if (munkTag.HasParam(wxT("DESCENT"))) {
+				int descent = 0;
+				if (munkTag.GetParamAsInt( wxT("DESCENT"), &descent )) {
+					cel->SetDescent(descent);
+				}
+			}
+
 			cel->SetId(munkTag.GetParam(wxT("id"))); // may be empty
 			GetContainer()->InsertCell(cel);
 			if (str) {
