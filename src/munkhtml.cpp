@@ -4674,6 +4674,10 @@ void MunkHtmlWindow::CreateLayout()
             m_Cell->Layout(ClientWidth); // ...and relayout
         }
     }
+
+    if (!m_OpenedAnchor.IsEmpty()) {
+	    ScrollToAnchor(m_OpenedAnchor);
+    }
 }
 
 
