@@ -1365,6 +1365,10 @@ bool MunkHtmlTag::GetParamAsLengthInInches(const wxString& par, double *inches) 
     if (parStr.Right(2).Upper() == wxT("IN")) {
 	    wxString doubleString = parStr.Left(parStr.Len() - 2);
 	    succ = doubleString.ToDouble(inches);
+	    if (!succ) {
+		    doubleString.Replace(wxT("."), wxT(","), true);
+		    succ = doubleString.ToDouble(inches);
+	    }
     } else {
 	    // At the moment, we only know how to deal with inches.
 	    succ = false;
