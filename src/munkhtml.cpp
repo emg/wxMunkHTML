@@ -1250,7 +1250,7 @@ IMPLEMENT_CLASS(MunkHtmlTag,wxObject)
 
 MunkHtmlTag::MunkHtmlTag(const wxString& source, const MunkAttributeMap& attrs) : wxObject()
 {
-	m_Name = wxString(source.c_str(), wxConvUTF8);
+	m_Name = wxString::FromUTF8(source.c_str());
 	m_Name.MakeUpper();
 
 	MunkAttributeMap::const_iterator ci = attrs.begin();
@@ -4995,7 +4995,7 @@ void MunkHtmlWindow::OnSize(wxSizeEvent& event)
 {
     wxDELETE(m_backBuffer);
 
-    wxScrolledWindow::OnSize(event);
+    // wxScrolledWindow::OnSize(event);
     CreateLayout();
 
     // Recompute selection if necessary:

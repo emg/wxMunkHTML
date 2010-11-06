@@ -273,7 +273,7 @@ bool MunkHtmlPrintout::OnBeginDocument(int startPage, int endPage)
 bool MunkHtmlPrintout::OnPrintPage(int page)
 {
     wxDC *dc = GetDC();
-    if (dc && dc->Ok())
+    if (dc && dc->IsOk())
     {
         if (HasPage(page))
             RenderPage(dc, page);
