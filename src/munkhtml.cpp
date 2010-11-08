@@ -1250,7 +1250,7 @@ IMPLEMENT_CLASS(MunkHtmlTag,wxObject)
 
 MunkHtmlTag::MunkHtmlTag(const wxString& source, const MunkAttributeMap& attrs) : wxObject()
 {
-	m_Name = wxString::FromUTF8(source.c_str());
+	m_Name = source;
 	m_Name.MakeUpper();
 
 	MunkAttributeMap::const_iterator ci = attrs.begin();
