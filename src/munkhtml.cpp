@@ -4392,33 +4392,40 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 	ps.SetDC(dc, 1.0);
 	ps.SetFS(GetFS());
 	ps.SetHTMLBackgroundColour(this->GetHTMLBackgroundColour());
-	bResult = ps.Parse(m_strPageSource, error_message);
-	SetTopCell(ps.GetInternalRepresentation());
-	SetForms(ps.TakeOverForms());
-	ps.SetTopCell(0); // Make sure we don't delete the cells in the ps destructor
-	    
-	Scroll(0,0);
+	try {
+		bResult = ps.Parse(m_strPageSource, error_message);
+		SetTopCell(ps.GetInternalRepresentation());
+		SetForms(ps.TakeOverForms());
+		ps.SetTopCell(0); // Make sure we don't delete the cells in the ps destructor
+		
+		Scroll(0,0);
+		
+		delete dc;
+		if (bResult) {
+			m_Cell->SetIndent(m_Borders, MunkHTML_INDENT_ALL, MunkHTML_UNITS_PIXELS);
+			m_Cell->SetAlignHor(MunkHTML_ALIGN_CENTER);
+			CreateLayout();
+		}
+		if (m_tmpCanDrawLocks == 0) {
+			Refresh();
+			Update();
+		}
+		
+		// This is necessary on Windows in order to be able to
+		// use anchors reliably (!)
+		
+		// (But this should be done at the application level, not
+		// here! So we comment it out again.)
+		
+		// SetFocus();
 
-	delete dc;
-	if (bResult) {
-		m_Cell->SetIndent(m_Borders, MunkHTML_INDENT_ALL, MunkHTML_UNITS_PIXELS);
-		m_Cell->SetAlignHor(MunkHTML_ALIGN_CENTER);
-		CreateLayout();
+		return true;
+		
+	} catch (MunkQDException e) {
+		
+		error_message = e.what();
+		return false;
 	}
-	if (m_tmpCanDrawLocks == 0) {
-		Refresh();
-		Update();
-	}
-
-	// This is necessary on Windows in order to be able to
-	// use anchors reliably (!)
-
-	// (But this should be done at the application level, not
-	// here! So we comment it out again.)
-
-	// SetFocus();
-
-	return true;
 }
 
 // utility function: read a wxString from a wxInputStream
