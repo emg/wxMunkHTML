@@ -3790,10 +3790,15 @@ MunkHtmlRadioBoxPanel::~MunkHtmlRadioBoxPanel()
 }
 
 
+BEGIN_EVENT_TABLE(MunkHtmlComboBoxPanel, wxPanel)
+    EVT_COMBOBOX(wxID_ANY, MunkHtmlComboBoxPanel::OnSelect)
+END_EVENT_TABLE()
 
-
-MunkHtmlComboBoxPanel::MunkHtmlComboBoxPanel(int selection, wxWindow* parent, wxWindowID id, const wxString& label, const wxPoint& point , const wxSize& size, const wxArrayString& choices, long style)
-	: wxPanel(parent, id)
+MunkHtmlComboBoxPanel::MunkHtmlComboBoxPanel(int selection, MunkHtmlWindow* parent, wxWindowID id, const wxString& label, const wxPoint& point , const wxSize& size, const wxArrayString& choices, long style, form_id_t form_id, bool bSubmitOnSelect)
+: wxPanel(parent, id),
+	m_form_id(form_id),
+	m_pParent(parent),
+	m_bSubmitOnSelect(bSubmitOnSelect)
 {
 	wxBoxSizer *pSizer = new wxBoxSizer(wxVERTICAL);
 	m_pComboBox = new wxComboBox(this, wxID_ANY, label, point, size, choices, style);
@@ -3807,7 +3812,7 @@ MunkHtmlComboBoxPanel::MunkHtmlComboBoxPanel(int selection, wxWindow* parent, wx
 #else
 	int border = 0;
 #endif
-	pSizer->Add( m_pComboBox, 1, wxALL|wxEXPAND, border);
+	pSizer->Add( m_pComboBox, 1, wxALL, border);
 
 	SetSizer(pSizer);
 
@@ -3816,6 +3821,15 @@ MunkHtmlComboBoxPanel::MunkHtmlComboBoxPanel(int selection, wxWindow* parent, wx
 
 MunkHtmlComboBoxPanel::~MunkHtmlComboBoxPanel()
 {
+}
+
+void MunkHtmlComboBoxPanel::OnSelect(wxCommandEvent& event)
+{
+	if (m_bSubmitOnSelect) {
+		m_pParent->OnFormSubmitClicked(m_form_id, wxT("ComboBox"));
+	} else {
+		event.Skip();
+	}
 }
 
 
@@ -6454,11 +6468,25 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			name = "hidden_name";
 		}
 
+		bool bSubmitOnSelect = false;
+		if (attrs.find("submitOnSelect") != attrs.end()) {
+			if (getMunkAttribute(attrs, "submitOnSelect") == "true") {
+				bSubmitOnSelect = true;
+			} else {
+				bSubmitOnSelect = false;
+			}
+		} else {
+			bSubmitOnSelect = false;
+		}
+
 		m_cur_form_select_name = name;
 
 		MunkHtmlForm *pForm = m_pCanvas->m_pForms->getForm(m_cur_form_id);
 		if (pForm != 0) {
 			pForm->addFormElement(name, kFESelect);
+
+			MunkHtmlFormElement *pComboBox = pForm->getFormElement(name);
+			pComboBox->setSubmitOnSelect(bSubmitOnSelect);
 		}
 	} else if (tag == "radiobox") {
 		// NONSTANDARD:
@@ -8014,7 +8042,9 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 						  wxDefaultPosition,
 						  wxDefaultSize,
 						  arrLabels,
-						  wxCB_READONLY);
+						  wxCB_READONLY,
+						  m_form_id,
+						  false); // bSubmitOnSelect
 
 		//m_pComboBoxPanel->Show(true);
 
@@ -8022,5 +8052,12 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 		return m_pWidgetCell;
 	} else {
 		return 0;
+	}
+}
+
+void MunkHtmlFormElement::setSubmitOnSelect(bool bSubmitOnSelect)
+{
+	if (m_pComboBoxPanel != 0) {
+		m_pComboBoxPanel->setSubmitOnSelect(bSubmitOnSelect);
 	}
 }

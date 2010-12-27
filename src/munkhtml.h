@@ -1453,9 +1453,26 @@ class MunkHtmlRadioBoxPanel : public wxPanel {
 };
 
 class MunkHtmlComboBoxPanel : public wxPanel {
+	DECLARE_EVENT_TABLE()
+	form_id_t m_form_id;
+	MunkHtmlWindow *m_pParent;
+	bool m_bSubmitOnSelect;
  public:
-	MunkHtmlComboBoxPanel(int selection, wxWindow* parent, wxWindowID id, const wxString& label, const wxPoint& point , const wxSize& size, const wxArrayString& choices, long style = wxRA_SPECIFY_ROWS);
+	MunkHtmlComboBoxPanel(int selection, 
+			      MunkHtmlWindow* parent, 
+			      wxWindowID id, 
+			      const wxString& label, 
+			      const wxPoint& point, 
+			      const wxSize& size, 
+			      const wxArrayString& choices, 
+			      long style,
+			      form_id_t form_id,
+			      bool bSubmitOnSelect);
 	virtual ~MunkHtmlComboBoxPanel();
+
+	void OnSelect(wxCommandEvent& event);
+
+	void setSubmitOnSelect(bool bSubmitOnSelect) { m_bSubmitOnSelect = bSubmitOnSelect; };
 
 	int GetSelection(void) { return m_pComboBox->GetSelection(); };
  protected:
@@ -1482,6 +1499,8 @@ class MunkHtmlFormElement {
 	void addValueLabelPair(const std::string& value, const std::string& label, bool bSelected = false);
 	MunkHtmlWidgetCell *realizeCell(MunkHtmlWindow *pParent);
 	void setDisabled(bool bDisabled) { m_bDisabled = bDisabled; };
+
+	void setSubmitOnSelect(bool bSubmitOnSelect);
 
 	static int GetNextID() { return m_next_id++; };
 	static void ResetNextID() { m_next_id = 20000; };
