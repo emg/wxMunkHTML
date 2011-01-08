@@ -1437,7 +1437,8 @@ public:
 	MunkHtmlButtonPanel(MunkHtmlWindow *pParent,
 			    int id,
 			    const wxString& strLabel,
-			    form_id_t form_id);
+			    form_id_t form_id,
+			    wxSize size);
 	virtual ~MunkHtmlButtonPanel();
 	void OnButtonClicked(wxCommandEvent& event);
 };
@@ -1492,8 +1493,9 @@ class MunkHtmlFormElement {
 	MunkHtmlRadioBoxPanel *m_pRadioBoxPanel;
 	MunkHtmlComboBoxPanel *m_pComboBoxPanel;
 	bool m_bDisabled;
+	int m_xSize;
  public:
-	MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind);
+	MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind, int xSize);
 	~MunkHtmlFormElement();
 	std::string getValue(); // Get selected value
 	void addValueLabelPair(const std::string& value, const std::string& label, bool bSelected = false);
@@ -1520,7 +1522,7 @@ class MunkHtmlForm {
 	std::string getAction() const { return m_action; };
 	int getFormNumber(void) const { return m_form_id; };
 
-	void addFormElement(const std::string& name, eMunkHtmlFormElementKind kind); // Silently does not add if already there
+	void addFormElement(const std::string& name, eMunkHtmlFormElementKind kind, int xSize); // Silently does not add if already there
 	MunkHtmlFormElement *getFormElement(const std::string& name);
 	std::map<std::string, std::string> getREQUEST(void);
 	std::list<MunkHtmlFormElement*> getFormElementList();

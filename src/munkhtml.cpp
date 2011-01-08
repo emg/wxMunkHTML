@@ -3728,14 +3728,14 @@ BEGIN_EVENT_TABLE(MunkHtmlButtonPanel, wxPanel)
     EVT_BUTTON(wxID_ANY, MunkHtmlButtonPanel::OnButtonClicked)
 END_EVENT_TABLE()
 
-MunkHtmlButtonPanel::MunkHtmlButtonPanel(MunkHtmlWindow *pParent, int id, const wxString& strLabel, form_id_t form_id)
+MunkHtmlButtonPanel::MunkHtmlButtonPanel(MunkHtmlWindow *pParent, int id, const wxString& strLabel, form_id_t form_id, wxSize size)
 : wxPanel(pParent, id),
 	m_form_id(form_id),
 	m_strLabel(strLabel),
 	m_pParent(pParent)
 {
 	wxBoxSizer *pSizer = new wxBoxSizer(wxVERTICAL);
-	m_pButton = new wxButton(this, wxID_ANY, strLabel, wxDefaultPosition, wxDefaultSize);
+	m_pButton = new wxButton(this, wxID_ANY, strLabel, wxDefaultPosition, size);
 
 #ifdef __WXMAC__
 	// We meed a border of 3 on Mac, otherwise it will overlap
@@ -3800,7 +3800,7 @@ MunkHtmlComboBoxPanel::MunkHtmlComboBoxPanel(int selection, MunkHtmlWindow* pare
 	m_pParent(parent),
 	m_bSubmitOnSelect(bSubmitOnSelect)
 {
-	wxBoxSizer *pSizer = new wxBoxSizer(wxVERTICAL);
+	wxBoxSizer *pSizer = new wxBoxSizer(wxHORIZONTAL);
 	m_pComboBox = new wxComboBox(this, wxID_ANY, label, point, size, choices, style);
 
 	m_pComboBox->SetSelection(selection);
@@ -6408,6 +6408,13 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			label = "";
 		}
 
+		int size = -1;
+		if (attrs.find("size") != attrs.end()) {
+			size = munk_string2long(getMunkAttribute(attrs, "size"));
+		} else {
+			// Nothing to do
+		}
+
 		if (fe_kind == kFESubmit) {
 			name = "submit";
 			label = value;
@@ -6415,7 +6422,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		MunkHtmlForm *pForm = m_pCanvas->m_pForms->getForm(m_cur_form_id);
 		if (pForm != 0) {
-			pForm->addFormElement(name, fe_kind);
+			pForm->addFormElement(name, fe_kind, size);
 
 			MunkHtmlFormElement *pFormElement = pForm->getFormElement(name);
 			pFormElement->addValueLabelPair(value, label);
@@ -6479,11 +6486,19 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			bSubmitOnSelect = false;
 		}
 
+		int size = -1;
+		if (attrs.find("size") != attrs.end()) {
+			size = munk_string2long(getMunkAttribute(attrs, "size"));
+		} else {
+			// Nothing to do
+		}
+
+
 		m_cur_form_select_name = name;
 
 		MunkHtmlForm *pForm = m_pCanvas->m_pForms->getForm(m_cur_form_id);
 		if (pForm != 0) {
-			pForm->addFormElement(name, kFESelect);
+			pForm->addFormElement(name, kFESelect, size);
 
 			MunkHtmlFormElement *pComboBox = pForm->getFormElement(name);
 			pComboBox->setSubmitOnSelect(bSubmitOnSelect);
@@ -6514,10 +6529,18 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			bDisabled = false;
 		}
 
+		int size = -1;
+		if (attrs.find("size") != attrs.end()) {
+			size = munk_string2long(getMunkAttribute(attrs, "size"));
+		} else {
+			// Nothing to do
+		}
+
+
 
 		MunkHtmlForm *pForm = m_pCanvas->m_pForms->getForm(m_cur_form_id);
 		if (pForm != 0) {
-			pForm->addFormElement(name, kFERadioBox);
+			pForm->addFormElement(name, kFERadioBox, size);
 			
 			MunkHtmlFormElement *pRadioBox = pForm->getFormElement(name);
 			pRadioBox->setDisabled(bDisabled);
@@ -7831,12 +7854,12 @@ MunkHtmlForm::~MunkHtmlForm()
 
 
 // Silently does not add if already there
-void MunkHtmlForm::addFormElement(const std::string& name, eMunkHtmlFormElementKind kind)
+void MunkHtmlForm::addFormElement(const std::string& name, eMunkHtmlFormElementKind kind, int size)
 {
 	if (m_form_elements.find(name) != m_form_elements.end()) {
 		return; // Silently do not add if already there
 	} else {
-		MunkHtmlFormElement *pFormElement = new MunkHtmlFormElement(m_form_id, kind);
+		MunkHtmlFormElement *pFormElement = new MunkHtmlFormElement(m_form_id, kind, size);
 		m_form_elements.insert(std::make_pair(name, pFormElement));
 	}
 }
@@ -7894,7 +7917,7 @@ std::list<MunkHtmlFormElement*> MunkHtmlForm::getFormElementList()
 
 int MunkHtmlFormElement::m_next_id = 20000;
 
-MunkHtmlFormElement::MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind)
+MunkHtmlFormElement::MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind, int xSize)
 {
 	m_form_id = form_id;
 	m_kind = kind;
@@ -7903,6 +7926,7 @@ MunkHtmlFormElement::MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElement
 	m_pRadioBoxPanel = 0;
 	m_pComboBoxPanel = 0;
 	m_bDisabled = false;
+	m_xSize = xSize;
 }
 
 
@@ -7983,7 +8007,7 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 		}
 		wxString strLabel(str_label.c_str(), wxConvUTF8);
 
-		MunkHtmlButtonPanel *pButtonPanel = new MunkHtmlButtonPanel(pParent, MunkHtmlFormElement::GetNextID(), strLabel, m_form_id);
+		MunkHtmlButtonPanel *pButtonPanel = new MunkHtmlButtonPanel(pParent, MunkHtmlFormElement::GetNextID(), strLabel, m_form_id, wxSize(m_xSize, -1));
 
 		// pButtonPanel->Show(true);
 
@@ -8011,7 +8035,7 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 						  MunkHtmlFormElement::GetNextID(),
 						  wxEmptyString, // label
 						  wxDefaultPosition,
-						  wxDefaultSize,
+						  wxSize(m_xSize, -1),
 						  arrLabels,
 						  0,
 						  wxRA_SPECIFY_ROWS);
@@ -8040,7 +8064,7 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 						  MunkHtmlFormElement::GetNextID(),
 						  arrLabels[m_selected_index],
 						  wxDefaultPosition,
-						  wxDefaultSize,
+						  wxSize(m_xSize, -1),
 						  arrLabels,
 						  wxCB_READONLY,
 						  m_form_id,
