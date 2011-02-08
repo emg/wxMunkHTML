@@ -6963,6 +6963,73 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			m_pCanvas->GetParentMunkHtmlWindow()->SetBorders(padding);
 		}
 
+		// NONSTANDARD          
+		wxString strFaceName;
+		bool bHasFace = false;
+		if (munkTag.HasParam(wxT("FONT-FACE"))) {
+			strFaceName = munkTag.GetParam(wxT("FONT-FACE"));
+		} else {
+			strFaceName = wxT("Arial");
+		}
+
+		if (attrs.find("font-face") != attrs.end()) {
+			std::list<std::string> face_name_list;
+
+			std::string face_list_string = getMunkAttribute(attrs, "font-face");
+			munk_split_string(face_list_string, ",", face_name_list);
+			
+			// Take first.
+			std::list<std::string>::const_iterator ci = face_name_list.begin();
+			std::string face_name = "Arial";
+			if (ci == face_name_list.end()) {
+				; // Just go with Arial
+			} else {
+				face_name = *ci;
+
+				// Only use it if it is non-empty
+				bHasFace = true;
+			}
+
+			std::cerr << "UP400: bHasFace = " << bHasFace << ", face_name = '" << face_name << "'\n";
+
+			strFaceName = wxString(face_name.c_str(), wxConvUTF8);
+		}
+
+
+		int newSizeFactor = GetActualFontSizeFactor();
+		if (munkTag.HasParam(wxT("BASE-SIZE"))) {
+			int tmp = 0;
+			wxChar c = munkTag.GetParam(wxT("BASE-SIZE")).GetChar(0);
+			if (munkTag.GetParamAsInt(wxT("BASE-SIZE"), &tmp)) {
+				int nCurrentSizeFactor = newSizeFactor;
+				int nNewPointSize = 0;
+				if (c == wxT('+') || c == wxT('-')) {
+					int nCurrentPointSize = ((m_nMagnification * DEFAULT_FONT_SIZE * nCurrentSizeFactor) / 10000);
+					nNewPointSize = nCurrentPointSize + tmp;
+				} else {
+					nNewPointSize = tmp;
+				}
+
+				if (nNewPointSize < 7) {
+					nNewPointSize = 7;
+				} else if (nNewPointSize > 32) {
+					nNewPointSize = 32;
+				}
+				newSizeFactor = (10000 * nNewPointSize) / (m_nMagnification * DEFAULT_FONT_SIZE);
+			}
+		}
+
+		MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
+		current_font_attributes.m_sizeFactor = newSizeFactor;
+
+		if (bHasFace) {
+			current_font_attributes.m_face = strFaceName;
+		}
+
+		m_HTML_font_attribute_stack.push(current_font_attributes);
+
+
+
 		if (attrs.find("background") != attrs.end()) {
 			int w = wxDefaultCoord, h = wxDefaultCoord;
 			MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
