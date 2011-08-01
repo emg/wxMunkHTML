@@ -6486,9 +6486,21 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			bSubmitOnSelect = false;
 		}
 
-		int size = -1;
+		int number_of_rows = 1;
 		if (attrs.find("size") != attrs.end()) {
-			size = munk_string2long(getMunkAttribute(attrs, "size"));
+			number_of_rows = munk_string2long(getMunkAttribute(attrs, "size"));
+		} else {
+			// Nothing to do
+		}
+
+		// NONSTANDARD:
+		// <select width="NUMBER">...</select>
+		// will create a combobox with the width specified (in pixels)
+		// Default is -1, so as to choose the one that matches
+		// the content.
+		int width = -1;
+		if (attrs.find("width") != attrs.end()) {
+			width = munk_string2long(getMunkAttribute(attrs, "width"));
 		} else {
 			// Nothing to do
 		}
@@ -6498,7 +6510,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		MunkHtmlForm *pForm = m_pCanvas->m_pForms->getForm(m_cur_form_id);
 		if (pForm != 0) {
-			pForm->addFormElement(name, kFESelect, size);
+			pForm->addFormElement(name, kFESelect, width);
 
 			MunkHtmlFormElement *pComboBox = pForm->getFormElement(name);
 			pComboBox->setSubmitOnSelect(bSubmitOnSelect);
@@ -8117,7 +8129,7 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 		std::list<std::pair<std::string, std::string> >::const_iterator ci = m_value_label_pair_list.begin();
 		while (ci != m_value_label_pair_list.end()) {
 			std::string str_label = ci->second;
-			
+
 			wxString strLabel(str_label.c_str(), wxConvUTF8);
 
 			arrLabels.Add(strLabel);
@@ -8137,7 +8149,7 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 						  m_form_id,
 						  false); // bSubmitOnSelect
 
-		//m_pComboBoxPanel->Show(true);
+		// m_pComboBoxPanel->Show(true);
 
 		m_pWidgetCell = new MunkHtmlWidgetCell(m_pComboBoxPanel, 0);
 		return m_pWidgetCell;
