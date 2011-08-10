@@ -7002,8 +7002,6 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				bHasFace = true;
 			}
 
-			std::cerr << "UP400: bHasFace = " << bHasFace << ", face_name = '" << face_name << "'\n";
-
 			strFaceName = wxString(face_name.c_str(), wxConvUTF8);
 		}
 
