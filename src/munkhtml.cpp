@@ -4433,8 +4433,11 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 		
 		// SetFocus();
 
-		return true;
-		
+		if (bResult) {	
+			return true;
+		} else {
+			return false;
+		}
 	} catch (MunkQDException e) {
 		
 		error_message = e.what();
