@@ -3642,6 +3642,30 @@ void MunkHtmlContainerCell::RemoveExtraSpacing(bool top, bool bottom)
 }
 
 
+//-----------------------------------------------------------------------------
+// MunkHtmlNegativeSpaceCell
+//-----------------------------------------------------------------------------
+
+IMPLEMENT_ABSTRACT_CLASS(MunkHtmlNegativeSpaceCell, MunkHtmlCell)
+
+MunkHtmlNegativeSpaceCell::MunkHtmlNegativeSpaceCell(int pixels, const wxDC& dc) : MunkHtmlWordCell(wxT(""), dc)
+{
+	m_Word = wxT("");
+	dc.GetTextExtent(m_Word, &m_Width, &m_Height, &m_Descent);
+	SetCanLiveOnPagebreak(false);
+	m_allowLinebreak = false;
+	m_Width = -pixels;
+}
+
+
+void MunkHtmlNegativeSpaceCell::Draw(wxDC& dc, int x, int y,
+				     int WXUNUSED(view_y1), int WXUNUSED(view_y2),
+				     MunkHtmlRenderingInfo& info)
+{
+}
+
+
+
 
 
 // --------------------------------------------------------------------------
@@ -6585,6 +6609,29 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 	} else if (tag == "em") {
 		startEm();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
+	} else if (tag == "negspace") {
+		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
+
+		// NONSTANDARD          
+		int pixels = 0;
+		if (munkTag.HasParam(wxT("PIXELS"))) {
+			if (!munkTag.GetParamAsInt(wxT("PIXELS"), &pixels)) {
+				pixels = 0;
+			}
+		} else if (munkTag.HasParam(wxT("PERCENT"))) {
+			int percent;
+			if (munkTag.GetParamAsInt(wxT("PERCENT"), &percent)) {
+				MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
+				int nPixelSize = ((int)(((m_nMagnification * DEFAULT_FONT_SIZE * current_font_attributes.m_sizeFactor * percent)) * m_pCanvas->GetPixelScale())) / 1000000;
+				pixels = nPixelSize;
+			} else {
+				pixels = 0;
+			}
+		} else {
+			pixels = 0;
+		}
+
+		GetContainer()->InsertCell(new MunkHtmlNegativeSpaceCell(pixels, *(m_pDC)));
 	} else if (tag == "i") {
 		startEm();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
@@ -7139,6 +7186,8 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 	} else if (tag == "em") {
 		endTag();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
+	} else if (tag == "negspace") {
+		// NONSTANDARD TAG!!!
 	} else if (tag == "i") {
 		endTag();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));

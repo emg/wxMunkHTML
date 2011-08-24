@@ -827,6 +827,26 @@ protected:
 
 
 // ----------------------------------------------------------------------------
+// MunkHtmlNegativeSpaceCell
+//                  Single word in input stream.
+// ----------------------------------------------------------------------------
+
+class MunkHtmlNegativeSpaceCell : public MunkHtmlWordCell
+{
+ protected:
+	int m_pixels;
+ public:
+	MunkHtmlNegativeSpaceCell(int pixels, const wxDC& dc);
+	virtual void Draw(wxDC& dc, int x, int y, int view_y1, int view_y2,
+			  MunkHtmlRenderingInfo& info);
+
+ protected:
+    DECLARE_ABSTRACT_CLASS(MunkHtmlNegativeSpaceCell)
+    DECLARE_NO_COPY_CLASS(MunkHtmlNegativeSpaceCell)
+};
+
+
+// ----------------------------------------------------------------------------
 // MunkHtmlPagebreakCell
 //                  Page break when printing (otherwise, invisible)
 // ----------------------------------------------------------------------------
