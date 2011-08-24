@@ -46,11 +46,7 @@
 
 
 
-#ifdef __WXMAC__
-#define DEFAULT_FONT_SIZE   (14)
-#else
 #define DEFAULT_FONT_SIZE   (13)
-#endif
 
 
 
