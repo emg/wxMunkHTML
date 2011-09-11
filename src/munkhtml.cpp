@@ -3810,6 +3810,34 @@ MunkHtmlRadioBoxPanel::~MunkHtmlRadioBoxPanel()
 }
 
 
+MunkHtmlTextInputPanel::MunkHtmlTextInputPanel(bool bEnable, int size_in_chars, int maxlength, const wxString& value, wxWindow* parent, wxWindowID id, const wxPoint& point , const wxSize& size, long style)
+	: wxPanel(parent, id)
+{
+	wxBoxSizer *pSizer = new wxBoxSizer(wxVERTICAL);
+	m_pTextCtrl = new wxTextCtrl(this, wxID_ANY, value, point, size, style);
+	m_pTextCtrl->Enable(bEnable);
+
+	m_pTextCtrl->SetValue(value);
+
+#ifdef __WXMAC__
+	// We meed a border of 3 on Mac, otherwise it will overlap
+	// with other stuff.
+	int border = 3;
+#else
+	int border = 0;
+#endif
+	pSizer->Add( m_pTextCtrl, 1, wxALL|wxEXPAND, border);
+
+	SetSizer(pSizer);
+
+	Fit();
+}
+
+MunkHtmlTextInputPanel::~MunkHtmlTextInputPanel()
+{
+}
+
+
 BEGIN_EVENT_TABLE(MunkHtmlComboBoxPanel, wxPanel)
     EVT_COMBOBOX(wxID_ANY, MunkHtmlComboBoxPanel::OnSelect)
 END_EVENT_TABLE()
@@ -6393,6 +6421,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			type = getMunkAttribute(attrs, "type");
 			if (type == "submit") {
 				fe_kind = kFESubmit;
+			} else if (type == "text") {
+				fe_kind = kFEText;
 			} else if (type == "hidden") {
 				fe_kind = kFEHidden;
 			} else {
@@ -6435,7 +6465,18 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		if (attrs.find("size") != attrs.end()) {
 			size = munk_string2long(getMunkAttribute(attrs, "size"));
 		} else {
-			// Nothing to do
+		  if (fe_kind == kFEText) {
+		    size = 15;
+		  }
+		}
+
+		int maxlength = -1;
+		if (attrs.find("maxlength") != attrs.end()) {
+			maxlength = munk_string2long(getMunkAttribute(attrs, "maxlength"));
+		} else {
+		  if (fe_kind == kFEText) {
+		    maxlength = 15;
+		  }
 		}
 
 		if (fe_kind == kFESubmit) {
@@ -6445,12 +6486,14 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		MunkHtmlForm *pForm = m_pCanvas->m_pForms->getForm(m_cur_form_id);
 		if (pForm != 0) {
-			pForm->addFormElement(name, fe_kind, size);
+		  pForm->addFormElement(name, fe_kind, size, maxlength);
 
 			MunkHtmlFormElement *pFormElement = pForm->getFormElement(name);
 			pFormElement->addValueLabelPair(value, label);
+			pFormElement->setDisabled(false);
 
-			if (fe_kind == kFESubmit) {
+
+			if (fe_kind != kFEHidden) {
 				MunkHtmlWidgetCell *pWidgetCell = 0;
 
 				pWidgetCell = pFormElement->realizeCell(m_pCanvas->GetParentMunkHtmlWindow());
@@ -6533,7 +6576,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		MunkHtmlForm *pForm = m_pCanvas->m_pForms->getForm(m_cur_form_id);
 		if (pForm != 0) {
-			pForm->addFormElement(name, kFESelect, width);
+		  pForm->addFormElement(name, kFESelect, width, -1);
 
 			MunkHtmlFormElement *pComboBox = pForm->getFormElement(name);
 			pComboBox->setSubmitOnSelect(bSubmitOnSelect);
@@ -6575,7 +6618,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		MunkHtmlForm *pForm = m_pCanvas->m_pForms->getForm(m_cur_form_id);
 		if (pForm != 0) {
-			pForm->addFormElement(name, kFERadioBox, size);
+		  pForm->addFormElement(name, kFERadioBox, size, -1);
 			
 			MunkHtmlFormElement *pRadioBox = pForm->getFormElement(name);
 			pRadioBox->setDisabled(bDisabled);
@@ -7979,12 +8022,12 @@ MunkHtmlForm::~MunkHtmlForm()
 
 
 // Silently does not add if already there
-void MunkHtmlForm::addFormElement(const std::string& name, eMunkHtmlFormElementKind kind, int size)
+void MunkHtmlForm::addFormElement(const std::string& name, eMunkHtmlFormElementKind kind, int size, int maxlength)
 {
 	if (m_form_elements.find(name) != m_form_elements.end()) {
 		return; // Silently do not add if already there
 	} else {
-		MunkHtmlFormElement *pFormElement = new MunkHtmlFormElement(m_form_id, kind, size);
+	  MunkHtmlFormElement *pFormElement = new MunkHtmlFormElement(m_form_id, kind, size, maxlength);
 		m_form_elements.insert(std::make_pair(name, pFormElement));
 	}
 }
@@ -8042,7 +8085,7 @@ std::list<MunkHtmlFormElement*> MunkHtmlForm::getFormElementList()
 
 int MunkHtmlFormElement::m_next_id = 20000;
 
-MunkHtmlFormElement::MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind, int xSize)
+MunkHtmlFormElement::MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind, int xSize, int xMaxLength)
 {
 	m_form_id = form_id;
 	m_kind = kind;
@@ -8052,6 +8095,7 @@ MunkHtmlFormElement::MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElement
 	m_pComboBoxPanel = 0;
 	m_bDisabled = false;
 	m_xSize = xSize;
+	m_xMaxLength = xMaxLength;
 }
 
 
@@ -8093,6 +8137,10 @@ std::string MunkHtmlFormElement::getValue()
 		}
 
 		return value;
+	} else if (m_kind == kFEText) {
+	  wxString strValue = m_pTextInputPanel->GetValue();
+	  std::string str_value = std::string((const char*) strValue.ToUTF8());
+	  return str_value;
 	} else if (m_kind == kFEHidden) {
 		std::string str_value;
 		if (m_value_label_pair_list.empty()) {
@@ -8198,6 +8246,26 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 		// m_pComboBoxPanel->Show(true);
 
 		m_pWidgetCell = new MunkHtmlWidgetCell(m_pComboBoxPanel, 0);
+		return m_pWidgetCell;
+	} else if (m_kind == kFEText) {
+	  std::string str_value = m_value_label_pair_list.begin()->first;
+
+	  wxString strValue(str_value.c_str(), wxConvUTF8);
+
+	  m_pTextInputPanel = 
+	    new MunkHtmlTextInputPanel(!m_bDisabled,
+				       m_xSize,
+				       m_xMaxLength,
+				       strValue,
+				       pParent, 
+				       MunkHtmlFormElement::GetNextID(),
+				       wxDefaultPosition,
+				       wxSize(m_xSize * 9, -1),
+				       0); // style
+	  
+	  // m_pTextInputPanel->Show(true);
+
+		m_pWidgetCell = new MunkHtmlWidgetCell(m_pTextInputPanel, 0);
 		return m_pWidgetCell;
 	} else {
 		return 0;

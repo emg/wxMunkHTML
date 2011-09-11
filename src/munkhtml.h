@@ -1444,6 +1444,7 @@ enum eMunkHtmlFormElementKind {
 	kFEHidden,
 	kFERadioBox,
 	kFESelect,
+	kFEText,
 };
 
 class MunkHtmlButtonPanel : public wxPanel {
@@ -1461,6 +1462,16 @@ public:
 			    wxSize size);
 	virtual ~MunkHtmlButtonPanel();
 	void OnButtonClicked(wxCommandEvent& event);
+};
+
+class MunkHtmlTextInputPanel : public wxPanel {
+ public:
+  MunkHtmlTextInputPanel(bool bEnable, int size_in_chars, int maxlength, const wxString& value, wxWindow* parent, wxWindowID id, const wxPoint& point , const wxSize& size, long style = 0);
+	virtual ~MunkHtmlTextInputPanel();
+
+	wxString GetValue(void) { return m_pTextCtrl->GetValue(); };
+ protected:
+	wxTextCtrl *m_pTextCtrl;
 };
 
 class MunkHtmlRadioBoxPanel : public wxPanel {
@@ -1510,12 +1521,14 @@ class MunkHtmlFormElement {
 	int m_selected_index;
 	MunkHtmlWidgetCell *m_pWidgetCell;
 	MunkHtmlButtonPanel *m_pButtonPanel;
+	MunkHtmlTextInputPanel *m_pTextInputPanel;
 	MunkHtmlRadioBoxPanel *m_pRadioBoxPanel;
 	MunkHtmlComboBoxPanel *m_pComboBoxPanel;
 	bool m_bDisabled;
 	int m_xSize;
+	int m_xMaxLength;
  public:
-	MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind, int xSize);
+	MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind, int xSize, int xMaxLength);
 	~MunkHtmlFormElement();
 	std::string getValue(); // Get selected value
 	void addValueLabelPair(const std::string& value, const std::string& label, bool bSelected = false);
@@ -1542,7 +1555,7 @@ class MunkHtmlForm {
 	std::string getAction() const { return m_action; };
 	int getFormNumber(void) const { return m_form_id; };
 
-	void addFormElement(const std::string& name, eMunkHtmlFormElementKind kind, int xSize); // Silently does not add if already there
+	void addFormElement(const std::string& name, eMunkHtmlFormElementKind kind, int xSize, int xMaxLength); // Silently does not add if already there
 	MunkHtmlFormElement *getFormElement(const std::string& name);
 	std::map<std::string, std::string> getREQUEST(void);
 	std::list<MunkHtmlFormElement*> getFormElementList();
