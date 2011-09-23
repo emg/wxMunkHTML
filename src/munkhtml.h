@@ -2177,7 +2177,7 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	typedef std::stack<wxString> TableAlignStack;
         TableAlignStack m_tAlignStack;
 	wxString m_rAlign;
-	typedef std::stack<std::pair<int, MunkHtmlContainerCell*> > TableCellInfoStack;
+	typedef std::stack<std::pair<std::pair<long,bool>, MunkHtmlContainerCell*> > TableCellInfoStack;
 	TableCellInfoStack m_table_cell_info_stack;
 
 	// List stuff

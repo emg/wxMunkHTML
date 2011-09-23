@@ -6885,11 +6885,24 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		MunkHtmlContainerCell *c;
 		if (tag == "table") {
 			int oldAlign = GetAlign();
+
+			bool bIsInline = false;
+			if (munkTag.HasParam(wxT("INLINE"))) {
+				wxString strInline = munkTag.GetParam(wxT("INLINE"), false);
+				strInline.MakeUpper();
+				if (strInline == wxT("TRUE")) {
+					bIsInline = true;
+				}
+			}
 			
 			MunkHtmlContainerCell *oldcont;
-			oldcont = c = OpenContainer();
+			if (bIsInline) {
+				oldcont = c = GetContainer();
+			} else {
+				oldcont = c = OpenContainer();
+			}
 
-			m_table_cell_info_stack.push(std::make_pair(oldAlign, oldcont));
+			m_table_cell_info_stack.push(std::make_pair(std::make_pair(oldAlign,bIsInline), oldcont));
 			
 			MunkHtmlTableCell *pTable = new MunkHtmlTableCell(c, munkTag);
 			m_tables_stack.push(pTable);
@@ -7254,14 +7267,17 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		MunkHtmlContainerCell *c = GetContainer();
 		c->SetIndent(GetCharHeight(), MunkHTML_INDENT_TOP);
 	} else if (tag == "table") {
-		std::pair<int, MunkHtmlContainerCell*> mypair = 
+		std::pair<std::pair<long,bool>, MunkHtmlContainerCell*> mypair = 
 			m_table_cell_info_stack.top();
 		m_table_cell_info_stack.pop();
 		m_tAlignStack.pop();
-
-		SetAlign(mypair.first);
+		
+		SetAlign(mypair.first.first);
 		SetContainer(mypair.second);
-		CloseContainer();
+		// if !bIsInline
+		if (!mypair.first.second) {
+			CloseContainer();
+		}
 		m_tables_stack.pop();
 	} else if (tag == "td" || tag == "tr" || tag == "th") {
 		; // Nothing to do
