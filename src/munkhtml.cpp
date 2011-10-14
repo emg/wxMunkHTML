@@ -6785,6 +6785,15 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			}
 		}
 		
+		// GetContainer()->GetBackgroundColour()
+		wxColour newBackgroundColor = wxNullColour;
+		if (munkTag.HasParam(wxT("BGCOLOR"))) {
+			wxColour background_clr;
+			if (munkTag.GetParamAsColour(wxT("BGCOLOR"), &background_clr)) {
+				newBackgroundColor = background_clr;
+			}
+		}
+		
 		int newSizeFactor = GetActualFontSizeFactor();
 		if (munkTag.HasParam(wxT("SIZE"))) {
 			int tmp = 0;
@@ -6842,6 +6851,9 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		m_HTML_font_attribute_stack.push(current_font_attributes);
 
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
+		if (newBackgroundColor != wxNullColour) {
+			GetContainer()->InsertCell(new MunkHtmlColourCell(newBackgroundColor, MunkHTML_CLR_BACKGROUND));
+		}
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
 	} else if (tag == "hr") {
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
@@ -7327,6 +7339,7 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		endTag();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
+		GetContainer()->InsertCell(new MunkHtmlColourCell(GetContainer()->GetBackgroundColour(), MunkHTML_CLR_BACKGROUND));
 	} else if (tag == "body") {
 		m_bInBody = false;
 	} else {
