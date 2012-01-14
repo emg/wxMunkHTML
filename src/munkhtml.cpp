@@ -30,6 +30,7 @@
     #include "wx/sstream.h"
     #include "wx/log.h"
     #include "wx/sizer.h"
+    #include "wx/app.h"
 #endif
 
 
@@ -3777,8 +3778,13 @@ MunkHtmlButtonPanel::~MunkHtmlButtonPanel()
 	
 void MunkHtmlButtonPanel::OnButtonClicked(wxCommandEvent& event)
 {
-	m_pParent->OnFormSubmitClicked(m_form_id, m_strLabel);
+	wxCommandEvent event2(MunkEVT_COMMAND_HTML_FORM_SUBMITTED);
+	event2.SetString(m_strLabel);
+	event2.SetInt(m_form_id);
+
+	::wxPostEvent(m_pParent, event2);
 }
+
 
 
 
@@ -3809,12 +3815,20 @@ MunkHtmlRadioBoxPanel::~MunkHtmlRadioBoxPanel()
 {
 }
 
+BEGIN_EVENT_TABLE(MunkHtmlTextInputPanel, wxPanel)
+    EVT_TEXT_ENTER(wxID_ANY, MunkHtmlTextInputPanel::OnEnter)
+END_EVENT_TABLE()
 
-MunkHtmlTextInputPanel::MunkHtmlTextInputPanel(bool bEnable, int size_in_chars, int maxlength, const wxString& value, wxWindow* parent, wxWindowID id, const wxPoint& point , const wxSize& size, long style)
-	: wxPanel(parent, id)
+
+
+MunkHtmlTextInputPanel::MunkHtmlTextInputPanel(bool bEnable, int size_in_chars, int maxlength, form_id_t form_id, const wxString& value, MunkHtmlWindow *pParent, wxWindowID id, const wxPoint& point , const wxSize& size, long style, bool bSubmitOnEnter)
+: wxPanel(pParent, id, wxDefaultPosition, wxDefaultSize, style),
+	  m_pParent(pParent),
+	  m_bSubmitOnEnter(bSubmitOnEnter),
+	  m_form_id(form_id)
 {
 	wxBoxSizer *pSizer = new wxBoxSizer(wxVERTICAL);
-	m_pTextCtrl = new wxTextCtrl(this, wxID_ANY, value, point, size, style);
+	m_pTextCtrl = new wxTextCtrl(this, wxID_ANY, value, point, size, style|wxTE_PROCESS_ENTER);
 	m_pTextCtrl->Enable(bEnable);
 
 	m_pTextCtrl->SetValue(value);
@@ -3836,6 +3850,21 @@ MunkHtmlTextInputPanel::MunkHtmlTextInputPanel(bool bEnable, int size_in_chars, 
 MunkHtmlTextInputPanel::~MunkHtmlTextInputPanel()
 {
 }
+
+
+void MunkHtmlTextInputPanel::OnEnter(wxCommandEvent& event)
+{
+	if (m_bSubmitOnEnter) {
+		wxCommandEvent event2(MunkEVT_COMMAND_HTML_FORM_SUBMITTED);
+		event2.SetString(wxString(wxT("TextInput")));
+		event2.SetInt(m_form_id);
+		
+		::wxPostEvent(m_pParent, event2);
+	} else {
+		event.Skip();
+	}
+}
+
 
 
 BEGIN_EVENT_TABLE(MunkHtmlComboBoxPanel, wxPanel)
@@ -3874,7 +3903,11 @@ MunkHtmlComboBoxPanel::~MunkHtmlComboBoxPanel()
 void MunkHtmlComboBoxPanel::OnSelect(wxCommandEvent& event)
 {
 	if (m_bSubmitOnSelect) {
-		m_pParent->OnFormSubmitClicked(m_form_id, wxT("ComboBox"));
+		wxCommandEvent event2(MunkEVT_COMMAND_HTML_FORM_SUBMITTED);
+		event2.SetString(wxString(wxT("ComboBox")));
+		event2.SetInt(m_form_id);
+		
+		::wxPostEvent(m_pParent, event2);
 	} else {
 		event.Skip();
 	}
@@ -4062,6 +4095,7 @@ IMPLEMENT_DYNAMIC_CLASS(MunkHtmlCellEvent, wxCommandEvent)
 DEFINE_EVENT_TYPE(MunkEVT_COMMAND_HTML_CELL_CLICKED)
 DEFINE_EVENT_TYPE(MunkEVT_COMMAND_HTML_CELL_HOVER)
 DEFINE_EVENT_TYPE(MunkEVT_COMMAND_HTML_LINK_CLICKED)
+DEFINE_EVENT_TYPE(MunkEVT_COMMAND_HTML_FORM_SUBMITTED)
 
 
 #if wxUSE_CLIPBOARD
@@ -5377,6 +5411,14 @@ void MunkHtmlWindow::OnMouseLeave(wxMouseEvent& event)
     }
 }
 
+void MunkHtmlWindow::OnFormSubmitted(wxCommandEvent& event)
+{
+	wxString strFormName = event.GetString();
+	int form_id = event.GetInt();
+	OnFormSubmitClicked(form_id, strFormName);
+}
+
+
 void MunkHtmlWindow::OnKeyUp(wxKeyEvent& event)
 {
     if ( IsSelectionEnabled() &&
@@ -5505,6 +5547,7 @@ void MunkHtmlWindow::SelectAll()
 IMPLEMENT_DYNAMIC_CLASS(MunkHtmlWindow,wxScrolledWindow)
 
 BEGIN_EVENT_TABLE(MunkHtmlWindow, wxScrolledWindow)
+    MUNK_EVT_HTML_FORM_SUBMITTED(wxID_ANY, MunkHtmlWindow::OnFormSubmitted)    
     EVT_SIZE(MunkHtmlWindow::OnSize)
     EVT_LEFT_DOWN(MunkHtmlWindow::OnMouseDown)
     EVT_LEFT_UP(MunkHtmlWindow::OnMouseUp)
@@ -8285,12 +8328,14 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 	    new MunkHtmlTextInputPanel(!m_bDisabled,
 				       m_xSize,
 				       m_xMaxLength,
+				       m_form_id,
 				       strValue,
 				       pParent, 
 				       MunkHtmlFormElement::GetNextID(),
 				       wxDefaultPosition,
 				       wxSize(m_xSize * 9, -1),
-				       0); // style
+				       0,  // style
+				       true); // bSubmitOnEnter // FIXME: Make this configurable via an attribute
 	  
 	  // m_pTextInputPanel->Show(true);
 

@@ -1465,13 +1465,21 @@ public:
 };
 
 class MunkHtmlTextInputPanel : public wxPanel {
+	DECLARE_EVENT_TABLE()
  public:
-  MunkHtmlTextInputPanel(bool bEnable, int size_in_chars, int maxlength, const wxString& value, wxWindow* parent, wxWindowID id, const wxPoint& point , const wxSize& size, long style = 0);
+	MunkHtmlTextInputPanel(bool bEnable, int size_in_chars, int maxlength, form_id_t form_id, const wxString& value, MunkHtmlWindow *pParent, wxWindowID id, const wxPoint& point , const wxSize& size, long style = 0, bool bSubmitOnEnter = false);
 	virtual ~MunkHtmlTextInputPanel();
+
+	void OnEnter(wxCommandEvent& event);
+
+	void setSubmitOnEnter(bool bSubmitOnEnter) { m_bSubmitOnEnter = bSubmitOnEnter; };
 
 	wxString GetValue(void) { return m_pTextCtrl->GetValue(); };
  protected:
 	wxTextCtrl *m_pTextCtrl;
+	MunkHtmlWindow *m_pParent;
+	bool m_bSubmitOnEnter;
+	form_id_t m_form_id;
 };
 
 class MunkHtmlRadioBoxPanel : public wxPanel {
@@ -1571,6 +1579,10 @@ class MunkHtmlFormContainer {
 	MunkHtmlForm *getForm(form_id_t form_id);
 	std::list<MunkHtmlForm*> getFormList();
 };
+
+
+
+
 
 
 // ----------------------------------------------------------------------------
@@ -1733,6 +1745,7 @@ protected:
     void OnMouseMove(wxMouseEvent& event);
     void OnMouseDown(wxMouseEvent& event);
     void OnMouseUp(wxMouseEvent& event);
+    void OnFormSubmitted(wxCommandEvent& event);
 #if wxUSE_CLIPBOARD
     void OnKeyUp(wxKeyEvent& event);
     void OnDoubleClick(wxMouseEvent& event);
@@ -1887,6 +1900,7 @@ BEGIN_DECLARE_EVENT_TYPES()
     DECLARE_EVENT_TYPE(MunkEVT_COMMAND_HTML_CELL_CLICKED, 1000)
     DECLARE_EVENT_TYPE(MunkEVT_COMMAND_HTML_CELL_HOVER, 1001)
     DECLARE_EVENT_TYPE(MunkEVT_COMMAND_HTML_LINK_CLICKED, 1002)
+    DECLARE_EVENT_TYPE(MunkEVT_COMMAND_HTML_FORM_SUBMITTED, 1003)
 END_DECLARE_EVENT_TYPES()
 
 
@@ -1974,6 +1988,14 @@ typedef void (wxEvtHandler::*MunkHtmlLinkEventFunction)(MunkHtmlLinkEvent&);
     wx__DECLARE_EVT1(MunkEVT_COMMAND_HTML_CELL_HOVER, id, MunkHtmlCellEventHandler(fn))
 #define MUNK_EVT_HTML_LINK_CLICKED(id, fn) \
     wx__DECLARE_EVT1(MunkEVT_COMMAND_HTML_LINK_CLICKED, id, MunkHtmlLinkEventHandler(fn))
+#define MUNK_EVT_HTML_FORM_SUBMITTED(id, fn) \
+    DECLARE_EVENT_TABLE_ENTRY( \
+        MunkEVT_COMMAND_HTML_FORM_SUBMITTED, id, wxID_ANY, \
+        (wxObjectEventFunction)(wxEventFunction) wxStaticCastEvent( wxCommandEventFunction, &fn ), \
+        (wxObject *) NULL \
+    ),
+
+
 
 //-----------------------------------------------------------------------------
 // MunkHtmlTableCell
