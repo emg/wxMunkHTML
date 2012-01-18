@@ -1002,7 +1002,7 @@ MunkHtmlFormContainer *MunkHtmlParsingStructure::TakeOverForms()
 }
 
 
-bool MunkHtmlParsingStructure::Parse(const wxString& text, std::string& error_message)
+bool MunkHtmlParsingStructure::Parse(const wxString& text, int nMagnification, std::string& error_message)
 {
 	bool bResult = true;
 	error_message = "";
@@ -1010,7 +1010,7 @@ bool MunkHtmlParsingStructure::Parse(const wxString& text, std::string& error_me
 	    
 		std::istringstream istr(std::string((const char*)text.mb_str(wxConvUTF8)));
 
-		MunkQDHTMLHandler dh(this);
+		MunkQDHTMLHandler dh(this, nMagnification);
 	    
 		MunkQDParser parser;
 		parser.parse(&dh, &istr);
@@ -4333,6 +4333,7 @@ void MunkHtmlWindow::CleanUpStatics()
 
 void MunkHtmlWindow::Init()
 {
+    m_nMagnification = 100;
     m_tmpCanDrawLocks = 0;
     m_FS = new wxFileSystem();
 #if wxUSE_STATUSBAR
@@ -4455,6 +4456,12 @@ void MunkHtmlWindow::SetForms(MunkHtmlFormContainer *pForms)
 	m_pForms = pForms; 
 };
 
+bool MunkHtmlWindow::ChangeMagnification(int nNewMagnification, std::string& error_message)
+{
+	m_nMagnification = nNewMagnification;
+	return DoSetPage(m_strPageSource, error_message);
+}
+
 bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_message)
 {
 	MunkHtmlFormElement::ResetNextID();
@@ -4489,7 +4496,7 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 	ps.SetFS(GetFS());
 	ps.SetHTMLBackgroundColour(this->GetHTMLBackgroundColour());
 	try {
-		bResult = ps.Parse(m_strPageSource, error_message);
+		bResult = ps.Parse(m_strPageSource, m_nMagnification, error_message);
 		SetTopCell(ps.GetInternalRepresentation());
 		SetForms(ps.TakeOverForms());
 		ps.SetTopCell(0); // Make sure we don't delete the cells in the ps destructor
@@ -6217,13 +6224,14 @@ void MunkHtmlTableCell::Layout(int w)
 //////////////////////////////////////////////////////////
 
 
-MunkQDHTMLHandler::MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas)
+MunkQDHTMLHandler::MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMagnification)
 	: m_chars(""),
 	  m_bInBody(false),
 	  m_pCurrentContainer(0),
 	  m_CharHeight(0),
 	  m_CharWidth(0),
-	  m_UseLink(false)
+	  m_UseLink(false),
+	  m_nMagnification(nMagnification)
 {
 	m_cur_form_id = 0;
 	m_pCanvas = pCanvas;
@@ -6232,7 +6240,6 @@ MunkQDHTMLHandler::MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas)
 	m_tmpStrBuf = NULL;
 	m_tmpStrBufSize = 0;
 	m_tmpLastWasSpace = false;
-	m_nMagnification = 100;
 	m_Numbering = 0;
 	m_lastWordCell = NULL;
         m_tAlignStack.push(wxEmptyString);
@@ -6845,7 +6852,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				int nCurrentSizeFactor = newSizeFactor;
 				int nNewPointSize = 0;
 				if (c == wxT('+') || c == wxT('-')) {
-					int nCurrentPointSize = ((m_nMagnification * DEFAULT_FONT_SIZE * nCurrentSizeFactor) / 10000);
+					int nCurrentPointSize = ((int)(((DEFAULT_FONT_SIZE * nCurrentSizeFactor)) * m_pCanvas->GetPixelScale())) / 100;
 					nNewPointSize = nCurrentPointSize + tmp;
 				} else {
 					nNewPointSize = tmp;
@@ -6856,7 +6863,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				} else if (nNewPointSize > 32) {
 					nNewPointSize = 32;
 				}
-				newSizeFactor = (10000 * nNewPointSize) / (m_nMagnification * DEFAULT_FONT_SIZE);
+				newSizeFactor = (int)((100.0 * nNewPointSize) / (DEFAULT_FONT_SIZE * m_pCanvas->GetPixelScale()));
 			}
 		}
 
@@ -7171,7 +7178,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				int nCurrentSizeFactor = newSizeFactor;
 				int nNewPointSize = 0;
 				if (c == wxT('+') || c == wxT('-')) {
-					int nCurrentPointSize = ((m_nMagnification * DEFAULT_FONT_SIZE * nCurrentSizeFactor) / 10000);
+					int nCurrentPointSize = ((DEFAULT_FONT_SIZE * nCurrentSizeFactor) / 100);
 					nNewPointSize = nCurrentPointSize + tmp;
 				} else {
 					nNewPointSize = tmp;
@@ -7182,7 +7189,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				} else if (nNewPointSize > 32) {
 					nNewPointSize = 32;
 				}
-				newSizeFactor = (10000 * nNewPointSize) / (m_nMagnification * DEFAULT_FONT_SIZE);
+				newSizeFactor = (100 * nNewPointSize) / (DEFAULT_FONT_SIZE);
 			}
 		}
 
@@ -7971,7 +7978,7 @@ bool MunkQDHTMLHandler::GetFontSmallCaps() const
 }
 
 
-void MunkQDHTMLHandler::LoadFonts(int magnification, wxDC *pInDC)
+void MunkQDHTMLHandler::ChangeMagnification(int magnification)
 {
 	m_nMagnification = magnification;
 
@@ -7981,11 +7988,6 @@ void MunkQDHTMLHandler::LoadFonts(int magnification, wxDC *pInDC)
 	// now round size to a multiple of 10
 	//pointSize = ((pointSize + 5) / 10) * 10;
 	
-	wxDC *pDC = pInDC;
-
-	// Set map mode
-	pDC->SetMapMode(wxMM_TEXT);
-
 	String2PFontMap::iterator it 
 		= m_HTML_font_map.begin();
 	while (it != m_HTML_font_map.end()) {

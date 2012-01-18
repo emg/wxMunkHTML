@@ -1805,6 +1805,8 @@ public:
     virtual void SetHTMLStatusText(const wxString& text);
     virtual wxCursor GetHTMLCursor(HTMLCursor type) const;
 
+    virtual bool ChangeMagnification(int nNewMagnification, std::string& error_message);
+
     // implementation of SetPage()
     bool DoSetPage(const wxString& source, std::string& error_message);
 
@@ -1835,6 +1837,7 @@ public:
     wxFrame *m_RelatedFrame;
     wxString m_TitleFormat;
     wxColour m_HTML_background_colour;
+    int m_nMagnification;
 #if wxUSE_STATUSBAR
     // frame in which page title should be displayed & number of it's statusbar
     // reserved for usage with this html window
@@ -2132,7 +2135,7 @@ class MunkHtmlParsingStructure {
 	virtual MunkHtmlContainerCell* GetInternalRepresentation() const { return m_Cell; }
 	virtual void SetTopCell(MunkHtmlContainerCell *pCell) { m_Cell = pCell; };
 
-	virtual bool Parse(const wxString& text, std::string& error_message);
+	virtual bool Parse(const wxString& text, int nMagnification, std::string& error_message);
 
 
  protected:
@@ -2212,7 +2215,7 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	// Font stuff
         wxArrayString m_Faces;
  public:
-	MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas);
+	MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMagnification);
 	virtual ~MunkQDHTMLHandler();
 	virtual void startElement(const std::string& tag, const MunkAttributeMap& attrs) throw(MunkQDException);
 	virtual void endElement(const std::string& tag) throw(MunkQDException);
@@ -2268,7 +2271,7 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	wxFont *getFontFromMunkHTMLFontAttributes(const MunkHTMLFontAttributes& font_attributes, bool bUseCacheMap);
 	void startMunkHTMLFontAttributeStack(void);
 	void SetCharWidthHeight(void);
-	void LoadFonts(int magnification, wxDC *pInD);
+	void ChangeMagnification(int magnification);
 
 	int GetAlign() const {return m_Align;}
 	void SetAlign(int a) {m_Align = a;}

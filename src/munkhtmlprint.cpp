@@ -91,7 +91,7 @@ void MunkHtmlDCRenderer::SetHtmlText(const wxString& html, const wxString& basep
 	
 	bool bResult = true;
 	std::string error_message = "";
-	bResult = m_Parser->Parse(html, error_message);
+	bResult = m_Parser->Parse(html, 100, error_message);
 	if (!bResult) {
 		wxMessageBox(wxString(wxT("An error occurred during the parsing of the HTML.\n")) + wxString(error_message.c_str(), wxConvUTF8));
 	} else {
