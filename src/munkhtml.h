@@ -536,6 +536,13 @@ protected:
 };
 
 
+enum {
+	MunkHTML_BACKGROUND_REPEAT_NO_REPEAT = 0,
+	MunkHTML_BACKGROUND_REPEAT_REPEAT_X = 1,
+	MunkHTML_BACKGROUND_REPEAT_REPEAT_Y = 2,
+	MunkHTML_BACKGROUND_REPEAT_REPEAT = 3,
+};
+
 // Flags for MunkHtmlCell::FindCellByPos
 enum
 {
@@ -1321,7 +1328,7 @@ public:
     virtual void SetHTMLBackgroundColour(const wxColour& clr) = 0;
 
     /// Sets window's background to given bitmap.
-    virtual void SetHTMLBackgroundImage(const wxBitmap& bmpBg) = 0;
+    virtual void SetHTMLBackgroundImage(const wxBitmap& bmpBg, int background_repeat) = 0;
 
     /// Sets status bar text.
     virtual void SetHTMLStatusText(const wxString& text) = 0;
@@ -1673,6 +1680,7 @@ public:
     // Sets the bitmap to use for background (currnetly it will be tiled,
     // when/if we have CSS support we could add other possibilities...)
     void SetBackgroundImage(const wxBitmap& bmpBg) { m_bmpBg = bmpBg; }
+    void SetBackgroundRepeat(int background_repeat) { m_nBackgroundRepeat = background_repeat; };
 
     // Goes to previous/next page (in browsing history)
     // Returns true if successful, false otherwise
@@ -1801,7 +1809,7 @@ public:
     virtual wxWindow* GetHTMLWindow();
     virtual wxColour GetHTMLBackgroundColour() const;
     virtual void SetHTMLBackgroundColour(const wxColour& clr);
-    virtual void SetHTMLBackgroundImage(const wxBitmap& bmpBg);
+    virtual void SetHTMLBackgroundImage(const wxBitmap& bmpBg, int background_repeat);
     virtual void SetHTMLStatusText(const wxString& text);
     virtual wxCursor GetHTMLCursor(HTMLCursor type) const;
 
@@ -1870,6 +1878,10 @@ private:
 
     // background image, may be invalid
     wxBitmap m_bmpBg;
+
+    // background image repeat (see enum with
+    // MunkHTML_BACKGROUND_REPEAT_... enum constants)
+    int m_nBackgroundRepeat;
 
     // variables used when user is selecting text
     wxPoint     m_tmpSelFromPos;

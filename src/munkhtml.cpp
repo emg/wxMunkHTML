@@ -47,7 +47,11 @@
 
 
 
+#ifdef __WXMAC__
+#define DEFAULT_FONT_SIZE   (14)
+#else
 #define DEFAULT_FONT_SIZE   (13)
+#endif
 
 
 
@@ -4478,7 +4482,7 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 	dc->SetMapMode(wxMM_TEXT);
 	//SetBackgroundColour(wxColour(0xFF, 0xFF, 0xFF));
 	SetHTMLBackgroundColour(wxNullColour);
-	SetBackgroundImage(wxNullBitmap);
+	SetHTMLBackgroundImage(wxNullBitmap, MunkHTML_BACKGROUND_REPEAT_REPEAT);
 
 	//m_Parser->SetDC(dc);
 	if (m_Cell) {
@@ -5003,16 +5007,40 @@ void MunkHtmlWindow::PaintBackground(wxDC& dc)
     if ( m_bmpBg.GetMask() ) {
 	    dc.SetBackground(wxBrush(GetBackgroundColour(), wxSOLID));
 	    dc.Clear();
+    } else {
+	    // However, with the new feature of repeat-x and repeat-y for the
+	    // background-repeat attribute of body, we always need to
+	    // erase the background...
+	    wxColour bgcolour = GetBackgroundColour();
+	    if (!bgcolour.Ok()) {
+		    bgcolour = *wxWHITE;
+	    }
+	    dc.SetBackground(wxBrush(bgcolour, wxSOLID));
+	    dc.Clear();
     }
 
     const wxSize sizeWin(GetClientSize());
     const wxSize sizeBmp(m_bmpBg.GetWidth(), m_bmpBg.GetHeight());
-    for ( wxCoord x = 0; x < sizeWin.x; x += sizeBmp.x )
-    {
-        for ( wxCoord y = 0; y < sizeWin.y; y += sizeBmp.y )
-        {
-            dc.DrawBitmap(m_bmpBg, x, y, true /* use mask */);
-        }
+
+    if (m_nBackgroundRepeat == MunkHTML_BACKGROUND_REPEAT_NO_REPEAT) {
+	    dc.DrawBitmap(m_bmpBg, 0, 0, true /* use mask */);
+    } else if (m_nBackgroundRepeat == MunkHTML_BACKGROUND_REPEAT_REPEAT_X) {
+	    wxCoord y = 0;
+	    for ( wxCoord x = 0; x < sizeWin.x; x += sizeBmp.x ) {
+		    dc.DrawBitmap(m_bmpBg, x, y, true /* use mask */);
+	    }
+    } else if (m_nBackgroundRepeat == MunkHTML_BACKGROUND_REPEAT_REPEAT_Y) {
+	    wxCoord x = 0;
+	    for ( wxCoord y = 0; y < sizeWin.y; y += sizeBmp.y ) {
+		    dc.DrawBitmap(m_bmpBg, x, y, true /* use mask */);
+	    }
+    } else {
+	    // m_nBackgroundRepeat == MunkHTML_BACKGROUND_REPEAT_REPEAT
+	    for ( wxCoord x = 0; x < sizeWin.x; x += sizeBmp.x ) {
+		    for ( wxCoord y = 0; y < sizeWin.y; y += sizeBmp.y ) {
+			    dc.DrawBitmap(m_bmpBg, x, y, true /* use mask */);
+		    }
+	    }
     }
 }
 
@@ -5023,9 +5051,12 @@ void MunkHtmlWindow::OnEraseBackground(wxEraseEvent& event)
 
 void MunkHtmlWindow::OnPaint(wxPaintEvent& WXUNUSED(event))
 {
-  if ( m_bmpBg.Ok() ) {
-    Refresh(true, NULL);
-  }
+	/*
+	// No longer needed, since the new PaintBackground does it...
+	if ( m_bmpBg.Ok() ) {
+	Refresh(true, NULL);
+	}
+	*/
 
     wxPaintDC dc(this);
 
@@ -5046,9 +5077,9 @@ void MunkHtmlWindow::OnPaint(wxPaintEvent& WXUNUSED(event))
         m_backBuffer = new wxBitmap(sz.x, sz.y);
     dcm.SelectObject(*m_backBuffer);
 
+    PrepareDC(dcm);
     PaintBackground(dcm);
 
-    PrepareDC(dcm);
     dcm.SetMapMode(wxMM_TEXT);
     dcm.SetBackgroundMode(wxTRANSPARENT);
 
@@ -5616,10 +5647,10 @@ void MunkHtmlWindow::SetHTMLBackgroundColour(const wxColour& clr)
 	SetBackgroundColour(clr);
 }
 
-void MunkHtmlWindow::SetHTMLBackgroundImage(const wxBitmap& bmpBg)
+void MunkHtmlWindow::SetHTMLBackgroundImage(const wxBitmap& bmpBg, int background_repeat)
 {
     SetBackgroundImage(bmpBg);
-    SetHTMLBackgroundColour(wxNullColour);
+    SetBackgroundRepeat(background_repeat);
 }
 
 void MunkHtmlWindow::SetHTMLStatusText(const wxString& text)
@@ -7199,18 +7230,35 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		if (bHasFace) {
 			current_font_attributes.m_face = strFaceName;
 		}
-
+		
 		m_HTML_font_attribute_stack.push(current_font_attributes);
 
-
-
 		if (attrs.find("background") != attrs.end()) {
+			// NONSTANDARD          
+			int background_repeat = MunkHTML_BACKGROUND_REPEAT_REPEAT;
+			if (munkTag.HasParam(wxT("BACKGROUND-REPEAT"))) {
+				wxString bgrepeat = munkTag.GetParam(wxT("BACKGROUND-REPEAT"));
+				if (bgrepeat == wxT("REPEAT")) {
+					background_repeat = MunkHTML_BACKGROUND_REPEAT_REPEAT;
+				} else if (bgrepeat == wxT("REPEAT-X")) {
+					background_repeat = MunkHTML_BACKGROUND_REPEAT_REPEAT_X;
+				} else if (bgrepeat == wxT("REPEAT-Y")) {
+					background_repeat = MunkHTML_BACKGROUND_REPEAT_REPEAT_Y;
+				} else if (bgrepeat == wxT("NO-REPEAT")) {
+					background_repeat = MunkHTML_BACKGROUND_REPEAT_NO_REPEAT;
+				} else {
+					// The default is "repeat"
+					background_repeat = MunkHTML_BACKGROUND_REPEAT_REPEAT;
+				}
+				
+			}
+			
 			int w = wxDefaultCoord, h = wxDefaultCoord;
 			MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 			wxFSFile *str;
 			wxString tmp(getMunkAttribute(attrs, "background").c_str(), wxConvUTF8);
 			wxString mn = wxEmptyString;
-
+			
 			str = m_pCanvas->GetFS()->OpenFile(tmp, wxFS_SEEKABLE|wxFS_READ);
 			if (str) {
 				wxInputStream *s = str->GetStream();
@@ -7218,17 +7266,12 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 					wxImage image(*s, wxBITMAP_TYPE_ANY);
 					if (image.Ok()) {
 						if (m_pCanvas->GetParentMunkHtmlWindow() != NULL) {
-							m_pCanvas->GetParentMunkHtmlWindow()->SetHTMLBackgroundImage(wxBitmap(image, -1));
+							m_pCanvas->GetParentMunkHtmlWindow()->SetHTMLBackgroundImage(wxBitmap(image, -1), background_repeat);
 						}
 					} else {
 						// std::cerr << "UP257: image was not OK!" << std::endl;
 					}
 				}
-				m_pCanvas->SetHTMLBackgroundColour(wxNullColour);
-				if (m_pCanvas->GetParentMunkHtmlWindow() != NULL) {
-					m_pCanvas->GetParentMunkHtmlWindow()->SetHTMLBackgroundColour(wxNullColour);
-				}
-
 				delete str;
 			}
 		} else {
@@ -7238,7 +7281,17 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				m_pCanvas->GetParentMunkHtmlWindow()->SetHTMLBackgroundColour(*wxWHITE);
 			}
 		}
-
+		
+		wxColour bgcolour = *wxWHITE;
+		if (munkTag.HasParam(wxT("BGCOLOR"))) {
+			munkTag.GetParamAsColour(wxT("BGCOLOR"), &bgcolour);
+		} else {
+			bgcolour = *wxWHITE;
+		}
+		m_pCanvas->SetHTMLBackgroundColour(bgcolour);
+		if (m_pCanvas->GetParentMunkHtmlWindow() != NULL) {
+			m_pCanvas->GetParentMunkHtmlWindow()->SetHTMLBackgroundColour(bgcolour);
+		}
 	} else {
 		throw MunkQDException(std::string("Unknown start-tag: <") + tag + ">");
 	}
