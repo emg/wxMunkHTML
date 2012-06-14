@@ -124,6 +124,49 @@ void munk_split_string(const std::string& instring, const std::string& splitchar
 
 
 
+/** Mangle XML entities in a string.
+ *
+ * Convert a string to something that can be used as PCDATA or CDATA,
+ * i.e., convert the "special" characters [<>&"] to their XML entity
+ * equivalents.
+ *
+ * @param input The input string to mangle
+ *
+ * @return The output string, with characters [<>&"] mangled to their
+ * XML entities.
+ */
+inline std::string munk_mangleXMLEntities(const std::string& input)
+{
+	std::string result;
+	result.reserve(input.length() + 4);
+	std::string::const_iterator ci = input.begin();
+	std::string::const_iterator cend = input.end();
+	while (ci != cend) {
+		char c = *ci;
+		switch (c) {
+		case '&':
+			result += "&amp;";
+			break;
+		case '\"':
+			result += "&quot;";
+			break;
+		case '<':
+			result += "&lt;";
+			break;
+		case '>':
+			result += "&gt;";
+			break;
+		default:
+			result += c;
+			break;
+		}
+		++ci;
+	}
+	return result;
+}
+
+
+
 /** Convert a long to a string.
  *
  * @param l The long to convert.
@@ -4020,10 +4063,10 @@ void MunkHtmlWidgetCell::Layout(int w)
 
 
 // ----------------------------------------------------------------------------
-// MunkHtmlTerminalCellsInterator
+// MunkHtmlTerminalCellsIterator
 // ----------------------------------------------------------------------------
 
-const MunkHtmlCell* MunkHtmlTerminalCellsInterator::operator++()
+const MunkHtmlCell* MunkHtmlTerminalCellsIterator::operator++()
 {
     if ( !m_pos )
         return NULL;
@@ -4056,6 +4099,60 @@ const MunkHtmlCell* MunkHtmlTerminalCellsInterator::operator++()
 
     return m_pos;
 }
+
+
+// ----------------------------------------------------------------------------
+// MunkHtmlCellsIterator
+// ----------------------------------------------------------------------------
+
+const MunkHtmlCell* MunkHtmlCellsIterator::operator++()
+{
+	if ( !m_pos ) {
+		return NULL;
+	}
+
+	if ( m_pos == m_to ) {
+		m_pos = NULL;
+		return NULL;
+	}
+
+	// Do we have a next?
+	if ( m_pos->GetNext()) {
+		// Yes, so get that
+		m_pos = m_pos->GetNext();
+		std::cerr << "UP250: ";
+	} else {
+		// No, we do not have a next.  We must go up
+		// the hierarchy until we reach container
+		// where this is not the last child.
+		while ( m_pos->GetNext() == NULL ) {
+			m_pos = m_pos->GetParent();
+			if ( !m_pos ) {
+				// If we got the root, return NULL.
+				std::cerr << "UP251!" << std::endl;
+				return NULL;
+			}
+		}
+
+		std::cerr << "UP252!";
+
+		m_pos = m_pos->GetNext();
+
+		// Then get the next one
+		if (m_pos != NULL && m_pos->GetFirstChild() != NULL) {
+			m_pos = m_pos->GetFirstChild();
+		}
+	}
+
+	if (m_pos != 0) {
+		std::cerr << "m_pos = '" << std::string((const char*)m_pos->toString().ToUTF8()) << "'\n";
+	} else {
+		std::cerr << "m_pos = NULL" << std::endl;
+	}
+	return m_pos;
+}
+
+
 
 
 
@@ -4879,6 +4976,11 @@ void MunkHtmlWindow::HistoryClear()
 }
 
 
+bool MunkHtmlWindow::CanCopy() const
+{
+	return IsSelectionEnabled() && m_selection != NULL;
+}
+
 bool MunkHtmlWindow::IsSelectionEnabled() const
 {
 #if wxUSE_CLIPBOARD
@@ -4890,37 +4992,52 @@ bool MunkHtmlWindow::IsSelectionEnabled() const
 
 
 #if wxUSE_CLIPBOARD
+wxString MunkHtmlWindow::DoSelectionToHtml(MunkHtmlSelection *sel)
+{
+	if ( !sel )
+		return wxEmptyString;
+	
+	wxString text;
+	
+	MunkHtmlCellsIterator i(sel->GetFromCell(), sel->GetToCell());
+	
+	while ( i ) {
+		text << i->toString();
+		std::cerr << "UP240: i->toString() = '" << std::string((const char*) i->toString().ToUTF8()) << "'" << std::endl;
+		++i;
+	}
+	return text;
+}
+
 wxString MunkHtmlWindow::DoSelectionToText(MunkHtmlSelection *sel)
 {
-    if ( !sel )
-        return wxEmptyString;
-    
-    wxClientDC dc(this);
-    wxString text;
+	if ( !sel )
+		return wxEmptyString;
+	
+	wxString text;
+	
+	MunkHtmlTerminalCellsIterator i(sel->GetFromCell(), sel->GetToCell());
+	const MunkHtmlCell *prev = NULL;
+	
+	while ( i ) {
+		// When converting HTML content to plain text, the entire paragraph
+		// (container in MunkHTML) goes on single line. A new paragraph (that
+		// should go on its own line) has its own container. Therefore, the
+		// simplest way of detecting where to insert newlines in plain text
+		// is to check if the parent container changed -- if it did, we moved
+		// to a new paragraph.
+		if ( prev && prev->GetParent() != i->GetParent() )
+			text << wxT('\n');
  
-     MunkHtmlTerminalCellsInterator i(sel->GetFromCell(), sel->GetToCell());
-     const MunkHtmlCell *prev = NULL;
- 
-     while ( i )
-     {
-         // When converting HTML content to plain text, the entire paragraph
-         // (container in MunkHTML) goes on single line. A new paragraph (that
-         // should go on its own line) has its own container. Therefore, the
-         // simplest way of detecting where to insert newlines in plain text
-         // is to check if the parent container changed -- if it did, we moved
-         // to a new paragraph.
-         if ( prev && prev->GetParent() != i->GetParent() )
-             text << wxT('\n');
- 
-         // NB: we don't need to pass the selection to ConvertToText() in the
-         //     middle of the selected text; it's only useful when only part of
-         //     a cell is selected
-         text << i->ConvertToText(sel);
- 
-        prev = *i;
-        ++i;
-    }
-    return text;
+		// NB: we don't need to pass the selection to ConvertToText() in the
+		//     middle of the selected text; it's only useful when only part of
+		//     a cell is selected
+		text << i->ConvertToText(sel);
+		
+		prev = *i;
+		++i;
+	}
+	return text;
 }
 
 wxString MunkHtmlWindow::ToText()
@@ -4937,40 +5054,63 @@ wxString MunkHtmlWindow::ToText()
 
 #endif // wxUSE_CLIPBOARD
 
-bool MunkHtmlWindow::CopySelection(ClipboardType t)
+bool MunkHtmlWindow::CopySelection(ClipboardType t, ClipboardOutputType cot)
 {
 #if wxUSE_CLIPBOARD
-    if ( m_selection )
-    {
+	std::cerr << "UP210: MunkHtmlWindow::CopySelection" << std::endl;
+	if ( m_selection ) {
+		std::cerr << "UP211: MunkHtmlWindow::CopySelection" << std::endl;
 #if defined(__UNIX__) && !defined(__WXMAC__)
-        wxTheClipboard->UsePrimarySelection(t == Primary);
+		wxTheClipboard->UsePrimarySelection(t == Primary);
 #else // !__UNIX__
-        // Primary selection exists only under X11, so don't do anything under
-        // the other platforms when we try to access it
-        //
-        // TODO: this should be abstracted at wxClipboard level!
-        if ( t == Primary )
-            return false;
+		std::cerr << "UP212: MunkHtmlWindow::CopySelection" << std::endl;
+		// Primary selection exists only under X11, so don't do anything under
+		// the other platforms when we try to access it
+		//
+		// TODO: this should be abstracted at wxClipboard level!
+		if ( t == Primary )
+			return false;
 #endif // __UNIX__/!__UNIX__
-
-        if ( wxTheClipboard->Open() )
-        {
-            const wxString txt(SelectionToText());
-            wxTheClipboard->SetData(new wxTextDataObject(txt));
-            wxTheClipboard->Close();
-            /*
-		    wxLogTrace(_T("wxhtmlselection"),
-                       _("Copied to clipboard:\"%s\""), txt.c_str());
-	    */
-
-            return true;
-        }
-    }
+		std::cerr << "UP213: MunkHtmlWindow::CopySelection" << std::endl;
+		
+		if (cot == kCOTText) {
+			std::cerr << "UP220: MunkHtmlWindow::CopySelection" << std::endl;
+			if ( wxTheClipboard->Open() ) {
+				const wxString txt(SelectionToText());
+				wxTheClipboard->SetData(new wxTextDataObject(txt));
+				wxTheClipboard->Close();
+				/*
+				  wxLogTrace(_T("wxhtmlselection"),
+				  _("Copied to clipboard:\"%s\""), txt.c_str());
+				*/
+				
+				return true;
+			}
+		} else {
+			std::cerr << "UP230: MunkHtmlWindow::CopySelection" << std::endl;
+			if ( wxTheClipboard->Open() ) {
+				bool bResult = false;
+				std::cerr << "UP231: MunkHtmlWindow::CopySelection" << std::endl;
+				const wxString htmlFragment = wxT("<html><body>") + SelectionToHtml() + wxT("</body></html>");
+				
+				wxDataObjectSimple *pDataObj = new wxDataObjectSimple(wxDF_HTML);
+				bool bResult2 = pDataObj->SetData(htmlFragment.Length() + 1, ((const void*) htmlFragment.ToUTF8()));
+				std::cerr << "UP231.5: MunkHtmlWindow::CopySelection: bResult2 = " << bResult2 << std::endl;
+				bResult = wxTheClipboard->SetData(pDataObj);
+				wxTheClipboard->Close();
+				std::cerr << "UP232: MunkHtmlWindow::CopySelection: bResult = " << bResult << std::endl;
+				return bResult;
+			} else {
+				std::cerr << "UP234: MunkHtmlWindow::CopySelection" << std::endl;
+				return false;
+			}
+		}
+	}
 #else
-    wxUnusedVar(t);
+	wxUnusedVar(t);
 #endif // wxUSE_CLIPBOARD
-
-    return false;
+	
+	return false;
 }
 
 
@@ -5205,7 +5345,7 @@ void MunkHtmlWindow::OnMouseUp(wxMouseEvent& event)
         // is not selecting text:
         if ( m_selection )
         {
-            CopySelection(Primary);
+		CopySelection(Primary);
 
             // we don't want mouse up event that ended selecting to be
             // handled as mouse click and e.g. follow hyperlink:
@@ -5472,7 +5612,7 @@ void MunkHtmlWindow::OnKeyUp(wxKeyEvent& event)
 
 void MunkHtmlWindow::OnCopy(wxCommandEvent& WXUNUSED(event))
 {
-    (void) CopySelection();
+	(void) CopySelection(Secondary, kCOTText);
 }
 
 void MunkHtmlWindow::OnClipboardEvent(wxClipboardTextEvent& WXUNUSED(event))
@@ -5576,6 +5716,13 @@ void MunkHtmlWindow::SelectAll()
         m_selection->Set(m_Cell->GetFirstTerminal(), m_Cell->GetLastTerminal());
         Refresh();
     }
+}
+
+void MunkHtmlWindow::ClearSelection()
+{
+        delete m_selection;
+        m_selection = NULL;
+	m_makingSelection = false;
 }
 
 #endif // wxUSE_CLIPBOARD
@@ -6250,6 +6397,103 @@ void MunkHtmlTableCell::Layout(int w)
 
 //////////////////////////////////////////////////////////
 //
+// MunkMiniDOMTag
+//
+//////////////////////////////////////////////////////////
+
+
+MunkMiniDOMTag::MunkMiniDOMTag(const std::string& tag, eMunkMiniDOMTagKind kind)
+	: m_tag(tag),
+	  m_kind(kind)
+
+{
+	// TODO: Implement
+}
+
+
+MunkMiniDOMTag::MunkMiniDOMTag(const std::string& tag, eMunkMiniDOMTagKind kind, const MunkAttributeMap& attrs)
+	: m_tag(tag),
+	  m_kind(kind),
+	  m_attributes(attrs)
+{
+}
+
+
+MunkMiniDOMTag::~MunkMiniDOMTag()
+{
+}
+
+
+void MunkMiniDOMTag::setAttr(const std::string& name, const std::string& value)
+{
+	m_attributes[name] = value;
+}
+
+
+wxString MunkMiniDOMTag::toString() const
+{
+	wxString strTag;
+	if (m_kind == kEndTag) {
+		strTag = wxT("</") + wxString(m_tag.c_str(), wxConvUTF8) + wxT('>');
+	} else {
+		strTag = wxT("<") + wxString(m_tag.c_str(), wxConvUTF8);
+
+		if (m_attributes.size() != 0) {
+			MunkAttributeMap::const_iterator ci = m_attributes.begin();
+			while (ci != m_attributes.end()) {
+				std::string name = ci->first;
+				std::string value = ci->second;
+				strTag += wxT(' ') + wxString(name.c_str(), wxConvUTF8) + wxT("=\"");
+				strTag += wxString(munk_mangleXMLEntities(value).c_str(), wxConvUTF8) + wxT('\"');
+				++ci;
+			}
+		}
+
+		if (m_kind == kSingleTag) {
+			strTag += wxT("/>");
+		} else {
+			MUNK_ASSERT_THROW(m_kind == kStartTag,
+					  "MunkMiniDOMTag: m_kind wasn't kStartTag.");
+			strTag += wxT('>');
+		}
+	}
+	return strTag;
+}
+
+
+
+
+
+
+//////////////////////////////////////////////////////////
+//
+// MunkHtmlTagCell
+//
+//////////////////////////////////////////////////////////
+
+
+MunkHtmlTagCell::MunkHtmlTagCell(MunkMiniDOMTag *pTag)
+	: m_pTag(pTag)
+{
+}
+
+MunkHtmlTagCell::~MunkHtmlTagCell()
+{
+	delete m_pTag;
+}
+
+wxString MunkHtmlTagCell::toString() const
+{
+	if (m_pTag != 0) {
+		return m_pTag->toString();
+	} else {
+		return wxEmptyString;
+	}
+}
+
+
+//////////////////////////////////////////////////////////
+//
 // MunkQDHTMLHandler
 //
 //////////////////////////////////////////////////////////
@@ -6311,6 +6555,13 @@ MunkQDHTMLHandler::~MunkQDHTMLHandler()
 	delete[] m_tmpStrBuf;
 }
 
+void MunkQDHTMLHandler::AddHtmlTagCell(MunkMiniDOMTag *pMiniDOMTag)
+{
+	if (GetContainer() != NULL) {
+		GetContainer()->InsertCell(new MunkHtmlTagCell(pMiniDOMTag));
+	}
+}
+
 
 void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttributeMap& attrs) throw(MunkQDException)
 {
@@ -6365,7 +6616,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 
 			PushLink(MunkHtmlLinkInfo(href, 
-						  wxT(""))); // target
+						  wxEmptyString)); // target
 			m_anchor_type_stack.push(kATHREF);
 		} else {
 			throw MunkQDException(std::string("Anchor start-tag <a ....> without either href or name! Please add either href or name"));
@@ -6376,6 +6627,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				CloseContainer();
 				OpenContainer();
 		}
+		wxString css_style;
+
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 		GetContainer()->SetAlign(munkTag);
 
@@ -6387,6 +6640,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			munkTag.GetParamAsColour(wxT("BGCOLOR"), &clrBkg);
 			if (clrBkg.Ok()) {
 				GetContainer()->SetBackgroundColour(clrBkg);
+				css_style += wxT("background-color : ") + munkTag.GetParam(wxT("BGCOLOR")) + wxT(';');
 			}
 		}
 
@@ -6401,6 +6655,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			marginLeft = (marginLeft*72.0);
 
 			GetContainer()->SetIndent((int) marginLeft, MunkHTML_INDENT_LEFT, MunkHTML_UNITS_PIXELS);
+			css_style += wxString::Format(wxT("margin-left : %fpx;"), marginLeft);
 		} else {
 			GetContainer()->SetIndent(0, MunkHTML_INDENT_LEFT, MunkHTML_UNITS_PIXELS);
 		}
@@ -6416,6 +6671,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			marginRight = (marginRight*72.0);
 
 			GetContainer()->SetIndent((int) marginRight, MunkHTML_INDENT_RIGHT, MunkHTML_UNITS_PIXELS);
+			css_style += wxString::Format(wxT("margin-right : %fpx;"), marginRight);
 		} else {
 			GetContainer()->SetIndent(0, MunkHTML_INDENT_RIGHT, MunkHTML_UNITS_PIXELS);
 		}
@@ -6433,6 +6689,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			firstLineIndent = (firstLineIndent*72);
 
 			GetContainer()->SetFirstLineIndent(firstLineIndent);
+			css_style += wxString::Format(wxT("text-indent : %fpx;"), firstLineIndent);
 		} else {
 			GetContainer()->SetFirstLineIndent(0);
 		}
@@ -6448,6 +6705,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			marginTop = (marginTop*72.0);
 
 			GetContainer()->SetIndent((int) marginTop, MunkHTML_INDENT_TOP, MunkHTML_UNITS_PIXELS);
+			css_style += wxString::Format(wxT("margin-top : %fpx;"), marginTop);
 		} else {
 			GetContainer()->SetIndent(GetCharHeight(), MunkHTML_INDENT_TOP, MunkHTML_UNITS_PIXELS);
 		}
@@ -6464,11 +6722,17 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			marginBottom = (marginBottom*72.0);
 
 			GetContainer()->SetIndent((int) marginBottom, MunkHTML_INDENT_BOTTOM, MunkHTML_UNITS_PIXELS);
+			css_style += wxString::Format(wxT("margin-bottom : %fpx;"), marginBottom);
 		} else {
 			GetContainer()->SetIndent(0, MunkHTML_INDENT_BOTTOM, MunkHTML_UNITS_PIXELS);
 		}
 
+		MunkMiniDOMTag *pMiniDOMTag = new MunkMiniDOMTag("p", kStartTag);
+		if (!css_style.IsEmpty()) {
+			pMiniDOMTag->setAttr("style", std::string((const char*)css_style.ToUTF8()));
+		}
 
+		AddHtmlTagCell(pMiniDOMTag);
 		
 	} else if (tag == "br") {
 		GetContainer()->InsertCell(new MunkHtmlLineBreakCell(m_pDC, GetContainer()->GetFirstChild()));
@@ -7318,6 +7582,7 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetContainer()->GetBackgroundColour(), MunkHTML_CLR_BACKGROUND));
 	} else if (tag == "p") {
+		AddHtmlTagCell(new MunkMiniDOMTag("p", kEndTag));
 	} else if (tag == "br") {
 		; // Nothing to do
 	} else if (tag == "form") {

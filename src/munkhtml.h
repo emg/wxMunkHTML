@@ -446,7 +446,7 @@ public:
     void SetToPrivPos(const wxPoint& pos) { m_toPrivPos = pos; }
     void ClearPrivPos() { m_toPrivPos = m_fromPrivPos = wxDefaultPosition; }
 
-    bool IsMunkpty() const
+    bool IsEmpty() const
         { return m_fromPos == wxDefaultPosition &&
                  m_toPos == wxDefaultPosition; }
 
@@ -726,6 +726,8 @@ public:
     virtual bool IsLinebreakAllowed() const
         { return !IsFormattingCell(); }
 
+    virtual wxString toString() const { return wxT(""); };
+ 
     // Returns true for simple == terminal cells, i.e. not composite ones.
     // This if for internal usage only and may disappear in future versions!
     virtual bool IsTerminalCell() const { return true; }
@@ -819,6 +821,8 @@ public:
 
     void SetPreviousWord(MunkHtmlWordCell *cell);
 
+    virtual wxString toString() const { return m_Word; };
+
 protected:
     void SetSelectionPrivPos(const wxDC& dc, MunkHtmlSelection *s) const;
     void Split(const wxDC& dc,
@@ -831,6 +835,43 @@ protected:
     DECLARE_ABSTRACT_CLASS(MunkHtmlWordCell)
     DECLARE_NO_COPY_CLASS(MunkHtmlWordCell)
 };
+
+enum eMunkMiniDOMTagKind {
+	kSingleTag,
+	kStartTag,
+	kEndTag
+};
+
+class MunkMiniDOMTag {
+protected:	
+	std::string m_tag;
+	eMunkMiniDOMTagKind m_kind;
+	MunkAttributeMap m_attributes;
+public:
+	MunkMiniDOMTag(const std::string& tag, eMunkMiniDOMTagKind kind);
+	MunkMiniDOMTag(const std::string& tag, eMunkMiniDOMTagKind kind, const MunkAttributeMap& attrs);
+	virtual ~MunkMiniDOMTag();
+	void setAttr(const std::string& name, const std::string& value);
+	const MunkAttributeMap& getAttrs() const { return m_attributes; };
+	eMunkMiniDOMTagKind getKind() const { return m_kind; };
+	std::string getTag() const { return m_tag; };
+	virtual wxString toString() const;
+ private:
+	DECLARE_NO_COPY_CLASS(MunkMiniDOMTag)
+};
+
+class MunkHtmlTagCell : public MunkHtmlCell
+{
+public:
+	MunkHtmlTagCell(MunkMiniDOMTag *pTag);
+	virtual ~MunkHtmlTagCell();
+	virtual wxString toString() const;
+ protected:
+	MunkMiniDOMTag *m_pTag;
+	DECLARE_NO_COPY_CLASS(MunkHtmlTagCell)
+};
+
+
 
 
 // ----------------------------------------------------------------------------
@@ -1202,13 +1243,13 @@ private:
 
 
 // ----------------------------------------------------------------------------
-// MunkHtmlTerminalCellsInterator
+// MunkHtmlTerminalCellsIterator
 // ----------------------------------------------------------------------------
 
-class MunkHtmlTerminalCellsInterator
+class MunkHtmlTerminalCellsIterator
 {
 public:
-    MunkHtmlTerminalCellsInterator(const MunkHtmlCell *from, const MunkHtmlCell *to)
+    MunkHtmlTerminalCellsIterator(const MunkHtmlCell *from, const MunkHtmlCell *to)
         : m_to(to), m_pos(from) {}
 
     operator bool() const { return m_pos != NULL; }
@@ -1218,6 +1259,20 @@ public:
 
 private:
     const MunkHtmlCell *m_to, *m_pos;
+};
+
+class MunkHtmlCellsIterator {
+ public:
+ MunkHtmlCellsIterator(const MunkHtmlCell *from, const MunkHtmlCell *to)
+	 : m_to(to), m_pos(from) {}
+	
+	operator bool() const { return m_pos != NULL; }
+	const MunkHtmlCell* operator++();
+	const MunkHtmlCell* operator->() const { return m_pos; }
+	const MunkHtmlCell* operator*() const { return m_pos; }
+	
+ private:
+	const MunkHtmlCell *m_to, *m_pos;
 };
 
 
@@ -1714,6 +1769,9 @@ public:
         { return MunkHTML_OPEN; }
 
 #if wxUSE_CLIPBOARD
+    // Returns iff IsSelectionEnabled() returns true && there is a selection.
+    bool CanCopy() const;
+    
     // Helper functions to select parts of page:
     void SelectWord(const wxPoint& pos);
     void SelectLine(const wxPoint& pos);
@@ -1721,6 +1779,8 @@ public:
 
     // Convert selection to text:
     wxString SelectionToText() { return DoSelectionToText(m_selection); }
+    wxString SelectionToHtml() { return DoSelectionToHtml(m_selection); }
+
 
     // Converts current page to text:
     wxString ToText();
@@ -1750,6 +1810,14 @@ protected:
     void OnEraseBackground(wxEraseEvent& event);
     void OnPaint(wxPaintEvent& event);
     void OnSize(wxSizeEvent& event);
+
+ public:
+ 
+    // Override this in descendant in order to do something.
+    // It is called right before deleting the old selection and making
+    // the start of the selection, in OnMouseDown.
+    virtual void HandleMouseStartMakingSelection() {};
+
     void OnMouseMove(wxMouseEvent& event);
     void OnMouseDown(wxMouseEvent& event);
     void OnMouseUp(wxMouseEvent& event);
@@ -1769,7 +1837,17 @@ protected:
 
     // Returns true if text selection is enabled (wxClipboard must be available
     // and MunkHW_NO_SELECTION not used)
+ public:
     bool IsSelectionEnabled() const;
+    void ClearSelection();
+
+ protected:
+
+    enum ClipboardOutputType {
+ 	    kCOTHTML,
+ 	    kCOTText
+    };
+    
 
     enum ClipboardType
     {
@@ -1780,14 +1858,17 @@ protected:
     // Copies selection to clipboard if the clipboard support is available
     //
     // returns true if anything was copied to clipboard, false otherwise
-    bool CopySelection(ClipboardType t = Secondary);
+    bool CopySelection(ClipboardType t = Secondary, ClipboardOutputType cot = kCOTText);
 
 #if wxUSE_CLIPBOARD
     // Automatic scrolling during selection:
     void StopAutoScrolling();
-#endif // wxUSE_CLIPBOARD
 
     wxString DoSelectionToText(MunkHtmlSelection *sel);
+    wxString DoSelectionToHtml(MunkHtmlSelection *sel);
+ 
+#endif // wxUSE_CLIPBOARD
+
 
 public:
     virtual wxFileSystem *GetFS() { return m_FS; };
@@ -2240,7 +2321,9 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	MunkHtmlContainerCell *CloseContainer();
 	MunkHtmlContainerCell *SetContainer(MunkHtmlContainerCell *pNewContainer);
 	MunkHtmlWindowInterface *GetWindowInterface() { return (MunkHtmlWindowInterface*) m_pCanvas; };
- 
+
+	void AddHtmlTagCell(MunkMiniDOMTag *pMiniDOMTag);
+
 	void handleChars(void);
 
 	void AddText(const std::string& str);
