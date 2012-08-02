@@ -7147,7 +7147,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				int nCurrentSizeFactor = newSizeFactor;
 				int nNewPointSize = 0;
 				if (c == wxT('+') || c == wxT('-')) {
-					int nCurrentPointSize = ((int)(((DEFAULT_FONT_SIZE * nCurrentSizeFactor)) * m_pCanvas->GetPixelScale())) / 100;
+					int nCurrentPointSize = ((int)(((DEFAULT_FONT_SIZE * nCurrentSizeFactor)))) / 100;
 					nNewPointSize = nCurrentPointSize + tmp;
 				} else {
 					nNewPointSize = tmp;
@@ -7158,7 +7158,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				} else if (nNewPointSize > 32) {
 					nNewPointSize = 32;
 				}
-				newSizeFactor = (int)((100.0 * nNewPointSize) / (DEFAULT_FONT_SIZE * m_pCanvas->GetPixelScale()));
+				newSizeFactor = (int)((100.0 * nNewPointSize) / (DEFAULT_FONT_SIZE));
 			}
 		}
 
