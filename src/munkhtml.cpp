@@ -3440,6 +3440,8 @@ void MunkHtmlContainerCell::SetAlign(const MunkHtmlTag& tag)
 		else if (alg == wxT("RIGHT"))
 			SetAlignHor(MunkHTML_ALIGN_RIGHT);
 		m_LastLayout = -1;
+	} else {
+		SetAlignHor(MunkHTML_ALIGN_LEFT);
 	}
 }
 
