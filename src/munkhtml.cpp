@@ -4122,7 +4122,9 @@ const MunkHtmlCell* MunkHtmlCellsIterator::operator++()
 	if ( m_pos->GetNext()) {
 		// Yes, so get that
 		m_pos = m_pos->GetNext();
-		std::cerr << "UP250: ";
+#ifdef __LINUX__
+		//std::cerr << "UP250: ";
+#endif
 	} else {
 		// No, we do not have a next.  We must go up
 		// the hierarchy until we reach container
@@ -4131,12 +4133,16 @@ const MunkHtmlCell* MunkHtmlCellsIterator::operator++()
 			m_pos = m_pos->GetParent();
 			if ( !m_pos ) {
 				// If we got the root, return NULL.
+#ifdef __LINUX__
 				std::cerr << "UP251!" << std::endl;
+#endif
 				return NULL;
 			}
 		}
 
+#ifdef __LINUX__
 		std::cerr << "UP252!";
+#endif
 
 		m_pos = m_pos->GetNext();
 
@@ -4146,11 +4152,13 @@ const MunkHtmlCell* MunkHtmlCellsIterator::operator++()
 		}
 	}
 
+#ifdef __LINUX__
 	if (m_pos != 0) {
 		std::cerr << "m_pos = '" << std::string((const char*)m_pos->toString().ToUTF8()) << "'\n";
 	} else {
 		std::cerr << "m_pos = NULL" << std::endl;
 	}
+#endif
 	return m_pos;
 }
 
@@ -5005,7 +5013,9 @@ wxString MunkHtmlWindow::DoSelectionToHtml(MunkHtmlSelection *sel)
 	
 	while ( i ) {
 		text << i->toString();
+#ifdef __LINUX__
 		std::cerr << "UP240: i->toString() = '" << std::string((const char*) i->toString().ToUTF8()) << "'" << std::endl;
+#endif
 		++i;
 	}
 	return text;
@@ -5059,13 +5069,19 @@ wxString MunkHtmlWindow::ToText()
 bool MunkHtmlWindow::CopySelection(ClipboardType t, ClipboardOutputType cot)
 {
 #if wxUSE_CLIPBOARD
+#ifdef __LINUX__
 	std::cerr << "UP210: MunkHtmlWindow::CopySelection" << std::endl;
+#endif
 	if ( m_selection ) {
+#ifdef __LINUX__
 		std::cerr << "UP211: MunkHtmlWindow::CopySelection" << std::endl;
+#endif
 #if defined(__UNIX__) && !defined(__WXMAC__)
 		wxTheClipboard->UsePrimarySelection(t == Primary);
 #else // !__UNIX__
+#ifdef __LINUX__
 		std::cerr << "UP212: MunkHtmlWindow::CopySelection" << std::endl;
+#endif
 		// Primary selection exists only under X11, so don't do anything under
 		// the other platforms when we try to access it
 		//
@@ -5073,10 +5089,14 @@ bool MunkHtmlWindow::CopySelection(ClipboardType t, ClipboardOutputType cot)
 		if ( t == Primary )
 			return false;
 #endif // __UNIX__/!__UNIX__
+#ifdef __LINUX__
 		std::cerr << "UP213: MunkHtmlWindow::CopySelection" << std::endl;
+#endif
 		
 		if (cot == kCOTText) {
-			std::cerr << "UP220: MunkHtmlWindow::CopySelection" << std::endl;
+#ifdef __LINUX__
+		  std::cerr << "UP220: MunkHtmlWindow::CopySelection" << std::endl;
+#endif
 			if ( wxTheClipboard->Open() ) {
 				const wxString txt(SelectionToText());
 				wxTheClipboard->SetData(new wxTextDataObject(txt));
@@ -5089,21 +5109,31 @@ bool MunkHtmlWindow::CopySelection(ClipboardType t, ClipboardOutputType cot)
 				return true;
 			}
 		} else {
+#ifdef __LINUX__
 			std::cerr << "UP230: MunkHtmlWindow::CopySelection" << std::endl;
+#endif
 			if ( wxTheClipboard->Open() ) {
 				bool bResult = false;
+#ifdef __LINUX__
 				std::cerr << "UP231: MunkHtmlWindow::CopySelection" << std::endl;
+#endif
 				const wxString htmlFragment = wxT("<html><body>") + SelectionToHtml() + wxT("</body></html>");
 				
 				wxDataObjectSimple *pDataObj = new wxDataObjectSimple(wxDF_HTML);
 				bool bResult2 = pDataObj->SetData(htmlFragment.Length() + 1, ((const void*) htmlFragment.ToUTF8()));
+#ifdef __LINUX__
 				std::cerr << "UP231.5: MunkHtmlWindow::CopySelection: bResult2 = " << bResult2 << std::endl;
+#endif
 				bResult = wxTheClipboard->SetData(pDataObj);
 				wxTheClipboard->Close();
+#ifdef __LINUX__
 				std::cerr << "UP232: MunkHtmlWindow::CopySelection: bResult = " << bResult << std::endl;
+#endif
 				return bResult;
 			} else {
+#ifdef __LINUX__
 				std::cerr << "UP234: MunkHtmlWindow::CopySelection" << std::endl;
+#endif
 				return false;
 			}
 		}
