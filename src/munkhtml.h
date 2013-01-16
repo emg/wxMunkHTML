@@ -231,6 +231,7 @@ class MunkQDParser {
 #include "wx/button.h"
 #include "wx/combobox.h"
 #include "wx/panel.h"
+#include "wx/regex.h"
 
 
 
@@ -824,6 +825,7 @@ class MunkHtmlWordCell : public MunkHtmlCell
 {
 public:
     MunkHtmlWordCell(const wxString& word, const wxDC& dc);
+    MunkHtmlWordCell(long m_SpaceWidth, long m_SpaceHeight, long m_SpaceDescent);
     virtual void Draw(wxDC& dc, int x, int y, int view_y1, int view_y2,
               MunkHtmlRenderingInfo& info);
     virtual wxCursor GetMouseCursor(MunkHtmlWindowInterface *window) const;
@@ -1174,7 +1176,7 @@ class MunkHtmlLineBreakCell : public MunkHtmlCell
  private:
 	long m_CharHeight;
     public:
-        MunkHtmlLineBreakCell(wxDC *dc, MunkHtmlCell *pPreviousCell);
+        MunkHtmlLineBreakCell(long CurrentCharHeight, MunkHtmlCell *pPreviousCell);
         virtual ~MunkHtmlLineBreakCell();
         virtual void Layout(int w);
 	virtual bool ForceLineBreak(void) { return true; };
@@ -2339,8 +2341,29 @@ enum eWhiteSpaceKind {
 	kWSKPreWrap,
 };
 
+class MunkFontStringMetrics {
+ public:
+	long m_StringWidth;
+	long m_StringHeight;
+	long m_StringDescent;
+	MunkFontStringMetrics(long StringWidth, long StringHeight, long StringDescent);
+	~MunkFontStringMetrics();
+	MunkFontStringMetrics(const MunkFontStringMetrics& other);
+	MunkFontStringMetrics& operator=(const MunkFontStringMetrics& other);
+ private:
+	void assign(const MunkFontStringMetrics& other);
+};
+
+typedef std::map<std::string, MunkFontStringMetrics> String2MunkFontStringMetrics;
 
 class MunkQDHTMLHandler : public MunkQDDocHandler {
+	static wxRegEx m_regex_space_newline_space;
+	static wxRegEx m_regex_space;
+	static wxRegEx m_regex_linefeed;
+	static wxRegEx m_regex_tab;
+	static wxRegEx m_regex_space_spaces;
+
+
 	MunkHtmlParsingStructure *m_pCanvas;
 	form_id_t m_cur_form_id;
 	std::string m_cur_form_select_name;
@@ -2365,12 +2388,17 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	long m_Align;
 	typedef std::map<std::string, wxFont*> String2PFontMap;
 	String2PFontMap m_HTML_font_map;
+	String2MunkFontStringMetrics m_FontSpaceCache; // Font characteristic string to MunkFontStringMetrics, currently only used for the string wxT(" ")
 	int m_nMagnification;
 	bool m_tmpLastWasSpace;
 	wxChar *m_tmpStrBuf;
 	size_t  m_tmpStrBufSize;
         // temporary variables used by AddText
 	MunkHtmlWordCell *m_lastWordCell;
+	std::string m_CurrentFontCharacteristicString;
+	long m_CurrentFontSpaceWidth;
+	long m_CurrentFontSpaceHeight;
+	long m_CurrentFontSpaceDescent;
 
 	// Table stuff
 	typedef std::stack<MunkHtmlTableCell*> TableCellStack;
@@ -2460,7 +2488,7 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	MunkHTMLFontAttributes startAnchorNAME(void);
 	MunkHTMLFontAttributes endTag(void);
 	MunkHTMLFontAttributes topFontAttributeStack(void);
-	wxFont *getFontFromMunkHTMLFontAttributes(const MunkHTMLFontAttributes& font_attributes, bool bUseCacheMap);
+	wxFont *getFontFromMunkHTMLFontAttributes(const MunkHTMLFontAttributes& font_attributes, bool bUseCacheMap, const std::string& characteristic_string);
 	void startMunkHTMLFontAttributeStack(void);
 	void SetCharWidthHeight(void);
 	void ChangeMagnification(int magnification);
