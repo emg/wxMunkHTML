@@ -31,6 +31,7 @@
     #include "wx/log.h"
     #include "wx/sizer.h"
     #include "wx/app.h"
+    #include "wx/regex.h"
 #endif
 
 
@@ -235,6 +236,20 @@ void munk_long2utf8(long c, std::string& output)
 	}
 }
 
+bool IsWhiteSpace(wxChar c)
+{
+	return c == wxT(' ')
+		|| c == wxT('\n')
+		|| c == wxT('\t')
+		|| c == wxT('\r');
+}
+
+bool IsNewLine(wxChar c)
+{
+	return c == wxT('\n');
+}
+
+
 
 
 
@@ -286,6 +301,19 @@ bool munk_is_hex(const std::string& str)
 	const std::string hex_digits = "0123456789abcdefABCDEF";
 	return str != "" && str.find_first_not_of(hex_digits) == std::string::npos;
 }
+
+/** Finds out whether a string is an integer or not.
+ *
+ * @param in The input string.
+ *
+ * @return True if this is an integer, False if it is not.
+ */
+bool munk_string_is_number(const std::string& in)
+{
+	return (in.size() > 0) 
+		&& (in.find_first_not_of("0123456789", 0) == std::string::npos);
+}
+
 
 /** Returns the long value of an arbitrary hex string.
  *
@@ -1326,18 +1354,17 @@ bool MunkHtmlTag::HasParam(const wxString& par) const
 
 wxString MunkHtmlTag::GetParam(const wxString& par, bool with_commas) const
 {
-    int index = m_ParamNames.Index(par, false);
-    if (index == wxNOT_FOUND)
-        return wxEmptyString;
-    if (with_commas)
-    {
-        // VS: backward compatibility, seems to be never used by MunkHTML...
-        wxString s;
-        s << wxT('"') << m_ParamValues[index] << wxT('"');
-        return s;
-    }
-    else
-        return m_ParamValues[index];
+	int index = m_ParamNames.Index(par, false);
+	if (index == wxNOT_FOUND)
+		return wxEmptyString;
+	if (with_commas) {
+	    // VS: backward compatibility, seems to be never used by MunkHTML...
+		wxString s;
+		s << wxT('"') << m_ParamValues[index] << wxT('"');
+		return s;
+	} else {
+		return m_ParamValues[index];
+	}
 }
 
 int MunkHtmlTag::ScanParam(const wxString& par,
@@ -1348,35 +1375,34 @@ int MunkHtmlTag::ScanParam(const wxString& par,
     return wxSscanf(parval, format, param);
 }
 
-bool MunkHtmlTag::GetParamAsColour(const wxString& par, wxColour *clr) const
+#define HTML_COLOUR(name, r, g, b)			\
+	if (str.IsSameAs(wxT(name), false)) {		\
+		clr->Set(r, g, b); return true; \
+	}
+
+bool GetStringAsColour(const wxString& str, wxColour *clr)
 {
     wxCHECK_MSG( clr, false, _T("invalid colour argument") );
 
-    wxString str = GetParam(par);
-
     // handle colours defined in HTML 4.0 first:
-    if (str.length() > 1 && str[0] != _T('#'))
-    {
-        #define HTML_COLOUR(name, r, g, b)              \
-            if (str.IsSameAs(wxT(name), false))         \
-                { clr->Set(r, g, b); return true; }
-        HTML_COLOUR("black",   0x00,0x00,0x00)
-        HTML_COLOUR("silver",  0xC0,0xC0,0xC0)
-        HTML_COLOUR("gray",    0x80,0x80,0x80)
-        HTML_COLOUR("white",   0xFF,0xFF,0xFF)
-        HTML_COLOUR("maroon",  0x80,0x00,0x00)
-        HTML_COLOUR("red",     0xFF,0x00,0x00)
-        HTML_COLOUR("purple",  0x80,0x00,0x80)
-        HTML_COLOUR("fuchsia", 0xFF,0x00,0xFF)
-        HTML_COLOUR("green",   0x00,0x80,0x00)
-        HTML_COLOUR("lime",    0x00,0xFF,0x00)
-        HTML_COLOUR("olive",   0x80,0x80,0x00)
-        HTML_COLOUR("yellow",  0xFF,0xFF,0x00)
-        HTML_COLOUR("navy",    0x00,0x00,0x80)
-        HTML_COLOUR("blue",    0x00,0x00,0xFF)
-        HTML_COLOUR("teal",    0x00,0x80,0x80)
-        HTML_COLOUR("aqua",    0x00,0xFF,0xFF)
-        #undef HTML_COLOUR
+    if (str.length() > 1 && str[0] != _T('#')) {
+	    HTML_COLOUR("black",   0x00,0x00,0x00);
+	    HTML_COLOUR("silver",  0xC0,0xC0,0xC0);
+	    HTML_COLOUR("gray",    0x80,0x80,0x80);
+	    HTML_COLOUR("white",   0xFF,0xFF,0xFF);
+	    HTML_COLOUR("maroon",  0x80,0x00,0x00);
+	    HTML_COLOUR("red",     0xFF,0x00,0x00);
+	    HTML_COLOUR("purple",  0x80,0x00,0x80);
+	    HTML_COLOUR("fuchsia", 0xFF,0x00,0xFF);
+	    HTML_COLOUR("green",   0x00,0x80,0x00);
+	    HTML_COLOUR("lime",    0x00,0xFF,0x00);
+	    HTML_COLOUR("olive",   0x80,0x80,0x00);
+	    HTML_COLOUR("yellow",  0xFF,0xFF,0x00);
+	    HTML_COLOUR("navy",    0x00,0x00,0x80);
+	    HTML_COLOUR("blue",    0x00,0x00,0xFF);
+	    HTML_COLOUR("teal",    0x00,0x80,0x80);
+	    HTML_COLOUR("aqua",    0x00,0xFF,0xFF);
+#undef HTML_COLOUR
     }
 
     // then try to parse #rrggbb representations or set from other well
@@ -1384,9 +1410,18 @@ bool MunkHtmlTag::GetParamAsColour(const wxString& par, wxColour *clr) const
     // but it doesn't do real harm -- but it *must* be done after the standard
     // colors are handled above):
     if (clr->Set(str))
-        return true;
-
+	    return true;
+    
     return false;
+}
+
+bool MunkHtmlTag::GetParamAsColour(const wxString& par, wxColour *clr) const
+{
+    wxCHECK_MSG( clr, false, _T("invalid colour argument") );
+
+    wxString str = GetParam(par);
+
+    return GetStringAsColour(str, clr);
 }
 
 bool MunkHtmlTag::GetParamAsInt(const wxString& par, int *clr) const
@@ -1396,28 +1431,91 @@ bool MunkHtmlTag::GetParamAsInt(const wxString& par, int *clr) const
 	long i;
 	if ( !GetParam(par).ToLong(&i) )
 		return false;
-
+	
 	*clr = (int)i;
 	return true;
 }
 
 bool MunkHtmlTag::GetParamAsLengthInInches(const wxString& par, double *inches) const
 {
-    if (!HasParam(par)) return false;
-    wxString parStr = GetParam(par);
-    bool succ;
-    if (parStr.Right(2).Upper() == wxT("IN")) {
-	    wxString doubleString = parStr.Left(parStr.Len() - 2);
-	    succ = doubleString.ToDouble(inches);
-	    if (!succ) {
-		    doubleString.Replace(wxT("."), wxT(","), true);
-		    succ = doubleString.ToDouble(inches);
-	    }
-    } else {
-	    // At the moment, we only know how to deal with inches.
-	    succ = false;
-    }
-    return succ;
+	if (!HasParam(par)) {
+		return false;
+	}
+	wxString parStr = GetParam(par);
+	bool succ;
+	if (parStr.Right(2).Upper() == wxT("IN")) {
+		wxString doubleString = parStr.Left(parStr.Len() - 2);
+		succ = doubleString.ToDouble(inches);
+		if (!succ) {
+			doubleString.Replace(wxT("."), wxT(","), true);
+			succ = doubleString.ToDouble(inches);
+		}
+	} else {
+		// At the moment, we only know how to deal with inches.
+		succ = false;
+	}
+	return succ;
+}
+
+bool MunkHtmlTag::GetParamAsLength(const wxString& par, int *pixels, double inches_to_pixels_factor) const
+{
+	// We only do in, px, and no unit at the moment
+	// (no unit == pixels)
+	if (!HasParam(par)){
+		return false;
+	}
+	wxString parStr = GetParam(par);
+	bool succ = false;
+	if (parStr.Right(2).Upper() == wxT("IN")) {
+		wxString doubleString = parStr.Left(parStr.Len() - 2);
+		double inches;
+		succ = doubleString.ToDouble(&inches);
+		if (!succ) {
+			doubleString.Replace(wxT("."), wxT(","), true);
+			succ = doubleString.ToDouble(&inches);
+		}
+		if (succ) {
+			*pixels = (int) (inches * inches_to_pixels_factor);
+		}
+	} else if (parStr.Right(2).Upper() == wxT("PX")) {
+		wxString doubleString = parStr.Left(parStr.Len() - 2);
+		double mypixels;
+		succ = doubleString.ToDouble(&mypixels);
+		if (!succ) {
+			doubleString.Replace(wxT("."), wxT(","), true);
+			succ = doubleString.ToDouble(&mypixels);
+		}
+		if (succ) {
+			*pixels = (int) mypixels;
+		}
+	} else {
+		wxString right = parStr.Right(1);
+		if (right == wxT("0") 
+		    || right == wxT("1")
+		    || right == wxT("2")
+		    || right == wxT("3")
+		    || right == wxT("4")
+		    || right == wxT("5")
+		    || right == wxT("6")
+		    || right == wxT("7")
+		    || right == wxT("8")
+		    || right == wxT("9")) {
+			wxString doubleString = parStr;
+			double mypixels;
+			succ = doubleString.ToDouble(&mypixels);
+			if (!succ) {
+				doubleString.Replace(wxT("."), wxT(","), true);
+				succ = doubleString.ToDouble(&mypixels);
+			}
+			if (succ) {
+				*pixels = (int) mypixels;
+			}
+		} else {
+			// At the moment, we only know how to deal with inches.
+			succ = false;
+		}
+	}
+	return succ;
 }
 
 wxString MunkHtmlTag::GetAllParams() const
@@ -2862,11 +2960,20 @@ MunkHtmlContainerCell::MunkHtmlContainerCell(MunkHtmlContainerCell *parent) : Mu
 	m_IndentFirstLine = 0;
 	m_WidthFloat = 100; m_WidthFloatUnits = MunkHTML_UNITS_PERCENT;
 	m_UseBkColour = false;
-	m_UseBorder = false;
+	m_bUseBorder = false;
 	m_MinHeight = 0;
 	m_MinHeightAlign = MunkHTML_ALIGN_TOP;
 	m_LastLayout = -1;
+	m_pBgImg = 0;
+	m_DeclaredHeight = -1; // Negative means: We haven't set the declared height
+	m_direction = MunkHTML_LTR;
+	m_BorderWidthTop = m_BorderWidthRight = m_BorderWidthBottom = m_BorderWidthLeft = 0;
+	m_BorderStyleTop = MunkHTML_BORDER_STYLE_NONE;
+	m_BorderStyleRight = MunkHTML_BORDER_STYLE_NONE;
+	m_BorderStyleBottom = MunkHTML_BORDER_STYLE_NONE;
+	m_BorderStyleLeft = MunkHTML_BORDER_STYLE_NONE;
 }
+
 
 void MunkHtmlContainerCell::SetBackgroundColour(const wxColour& clr)
 {
@@ -2888,6 +2995,263 @@ MunkHtmlContainerCell::~MunkHtmlContainerCell()
         delete cell;
         cell = cellNext;
     }
+}
+
+void MunkHtmlContainerCell::SetDirection(const MunkHtmlTag& tag)
+{
+	wxString dir;
+	if (tag.HasParam(wxT("DIRECTION"))) {
+		dir = tag.GetParam(wxT("DIRECTION"));
+	}
+
+	if (!dir.IsEmpty()) {
+		dir.MakeUpper();
+		if (dir == wxT("RTL")) {
+			m_direction = MunkHTML_RTL;
+		} else if (dir == wxT("LTR")) {
+			m_direction = MunkHTML_LTR;
+		} else {
+			m_direction = MunkHTML_LTR;
+		}
+		m_LastLayout = -1;
+	} else {
+		m_direction = MunkHTML_LTR;
+		m_LastLayout = -1;
+	}
+}
+
+
+void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string& tag, const MunkHtmlTag& munkTag, wxString& css_style, int CurrentCharHeight)
+{
+	int margin_top = 0;
+	int margin_right = 0;
+	int margin_bottom = 0;
+	int margin_left = 0;
+
+	int padding_top = 0;
+	int padding_right = 0;
+	int padding_bottom = 0;
+	int padding_left = 0;
+
+	// NONSTANDARD		
+	if (munkTag.HasParam(wxT("MARGIN"))) {
+		int margin;
+		// Convert to pixels, based on 72 dpi
+		// FIXME: What about printing?
+		if (!munkTag.GetParamAsLength(wxT("MARGIN"), &margin, 72.0)) {
+			margin = 0;
+		}
+		
+		margin_top = margin_right = margin_bottom = margin_left = margin;
+		css_style += wxString::Format(wxT("margin : %dpx;"), margin_top);
+	} else {
+
+		// NONSTANDARD		
+		if (munkTag.HasParam(wxT("MARGIN_TOP"))) {
+			int marginTop;
+
+			// Convert to pixels, based on 72 dpi
+			// FIXME: What about printing?
+			if (!munkTag.GetParamAsLength(wxT("MARGIN_TOP"), &marginTop, 72.0)) {
+				marginTop = 0;
+			}
+
+			margin_top = marginTop;
+		
+			css_style += wxString::Format(wxT("margin-top : %dpx;"), margin_top);
+		} else {
+			if (tag == "p" 
+			    || tag == "pre"
+			    || tag == "h1"
+			    || tag == "h2" 
+			    || tag == "h3") {
+				margin_top = CurrentCharHeight;
+			} else if (tag == "tr"
+			    || tag == "td"
+			    || tag == "th") {
+				margin_top = 0;
+			}
+		}
+
+		
+		// NONSTANDARD		
+		if (munkTag.HasParam(wxT("MARGIN_RIGHT"))) {
+			int marginRight;
+
+			// Convert to pixels, based on 72 dpi
+			// FIXME: What about printing?
+			if (!munkTag.GetParamAsLength(wxT("MARGIN_RIGHT"), &marginRight, 72.0)) {
+				marginRight = 0;
+			}
+			
+			margin_right = marginRight;
+			
+			css_style += wxString::Format(wxT("margin-right : %dpx;"), margin_right);
+		} else {
+			margin_right = 0;
+		}
+
+		// NONSTANDARD		
+		if (munkTag.HasParam(wxT("MARGIN_BOTTOM"))) {
+			int marginBottom;
+
+			// Convert to pixels, based on 72 dpi
+			// FIXME: What about printing?
+			if (!munkTag.GetParamAsLength(wxT("MARGIN_BOTTOM"), &marginBottom, 72.0)) {
+				marginBottom = 0;
+			}
+
+			margin_bottom = marginBottom;
+
+			css_style += wxString::Format(wxT("margin-bottom : %dpx;"), margin_bottom);
+		} else {
+			int indent_bottom = 0;
+			if (tag == "h1" || tag == "h2" || tag == "h3") {
+				margin_bottom = 12; // pixels
+			} else {
+				margin_bottom = 0;
+			}
+		}
+
+		// NONSTANDARD		
+		if (munkTag.HasParam(wxT("MARGIN_LEFT"))) {
+			int marginLeft;
+
+			// Convert to pixels, based on 72 dpi
+			// FIXME: What about printing?
+			if (!munkTag.GetParamAsLength(wxT("MARGIN_LEFT"), &marginLeft, 72.0)) {
+				marginLeft = 0;
+			}
+
+			margin_left = marginLeft;
+
+			css_style += wxString::Format(wxT("margin-left : %dpx;"), margin_left);
+		} else {
+			margin_left = 0;
+		}
+
+	}
+
+
+	/////////////////////////////
+	//
+	// PADDING
+	//
+	/////////////////////////////
+
+	// NONSTANDARD		
+	if (munkTag.HasParam(wxT("PADDING"))) {
+		int padding;
+		// Convert to pixels, based on 72 dpi
+		// FIXME: What about printing?
+		if (!munkTag.GetParamAsLength(wxT("PADDING"), &padding, 72.0)) {
+			padding = 0;
+		}
+		
+		padding_top = padding_right = padding_bottom = padding_left = padding;
+		css_style += wxString::Format(wxT("padding : %dpx;"), padding_top);
+	} else {
+
+		// NONSTANDARD		
+		if (munkTag.HasParam(wxT("PADDING_TOP"))) {
+			int paddingTop;
+
+			// Convert to pixels, based on 72 dpi
+			// FIXME: What about printing?
+			if (!munkTag.GetParamAsLength(wxT("PADDING_TOP"), &paddingTop, 72.0)) {
+				paddingTop = 0;
+			}
+
+			padding_top = paddingTop;
+		
+			css_style += wxString::Format(wxT("padding-top : %dpx;"), padding_top);
+		} else {
+			padding_top = 0;
+		}
+
+		
+		// NONSTANDARD		
+		if (munkTag.HasParam(wxT("PADDING_RIGHT"))) {
+			int paddingRight;
+
+			// Convert to pixels, based on 72 dpi
+			// FIXME: What about printing?
+			if (!munkTag.GetParamAsLength(wxT("PADDING_RIGHT"), &paddingRight, 72.0)) {
+				paddingRight = 0;
+			}
+			
+			padding_right = paddingRight;
+			
+			css_style += wxString::Format(wxT("padding-right : %dpx;"), padding_right);
+		} else {
+			padding_right = 0;
+		}
+
+		// NONSTANDARD		
+		if (munkTag.HasParam(wxT("PADDING_BOTTOM"))) {
+			int paddingBottom;
+
+			// Convert to pixels, based on 72 dpi
+			// FIXME: What about printing?
+			if (!munkTag.GetParamAsLength(wxT("PADDING_BOTTOM"), &paddingBottom, 72.0)) {
+				paddingBottom = 0;
+			}
+
+			padding_bottom = paddingBottom;
+
+			css_style += wxString::Format(wxT("padding-bottom : %dpx;"), padding_bottom);
+		} else {
+			padding_bottom = 0;
+		}
+
+		// NONSTANDARD		
+		if (munkTag.HasParam(wxT("PADDING_LEFT"))) {
+			int paddingLeft;
+
+			// Convert to pixels, based on 72 dpi
+			// FIXME: What about printing?
+			if (!munkTag.GetParamAsLength(wxT("PADDING_LEFT"), &paddingLeft, 72.0)) {
+				paddingLeft = 0;
+			}
+
+			padding_left = paddingLeft;
+
+			css_style += wxString::Format(wxT("padding-left : %dpx;"), padding_left);
+		} else {
+			padding_left = 0;
+		}
+
+	}
+
+
+	int indent_top = margin_top + padding_top;
+	int indent_right = margin_right + padding_right;
+	int indent_bottom = margin_bottom + padding_bottom;
+	int indent_left = margin_left + padding_left;
+
+	this->SetIndent(indent_top, MunkHTML_INDENT_TOP, MunkHTML_UNITS_PIXELS);
+	this->SetIndent(indent_right, MunkHTML_INDENT_RIGHT, MunkHTML_UNITS_PIXELS);
+	this->SetIndent(indent_bottom, MunkHTML_INDENT_BOTTOM, MunkHTML_UNITS_PIXELS);
+	this->SetIndent(indent_left, MunkHTML_INDENT_LEFT, MunkHTML_UNITS_PIXELS);
+
+	// NONSTANDARD		
+	if (munkTag.HasParam(wxT("TEXT_INDENT"))) {
+		int firstLineIndent;
+
+		// Convert to pixels, based on 72 dpi
+		// FIXME: What about printing?
+		if (!munkTag.GetParamAsLength(wxT("TEXT_INDENT"), &firstLineIndent, 72.0)) {
+			firstLineIndent = 0;
+		}
+
+
+		int first_line_indent = firstLineIndent;
+
+		this->SetFirstLineIndent(first_line_indent);
+		css_style += wxString::Format(wxT("text-indent : %dpx;"), first_line_indent);
+	} else {
+		this->SetFirstLineIndent(0);
+	}
 }
 
 
@@ -2952,327 +3316,390 @@ bool MunkHtmlContainerCell::AdjustPagebreak(int *pagebreak, int render_height,
 void MunkHtmlContainerCell::Layout(int w)
 {
 	MunkHtmlCell::Layout(w);
+	
+	if (m_LastLayout == w) {
+		return;
+	}
+	m_LastLayout = w;
 
-    if (m_LastLayout == w)
-	    return;
-    m_LastLayout = w;
-
-    // VS: Any attempt to layout with negative or zero width leads to hell,
-    // but we can't ignore such attempts completely, since it sometimes
-    // happen (e.g. when trying how small a table can be). The best thing we
-    // can do is to set the width of child cells to zero
-    if (w < 1)
-    {
-       m_Width = 0;
-       for (MunkHtmlCell *cell = m_Cells; cell; cell = cell->GetNext())
-            cell->Layout(0);
-            // this does two things: it recursively calls this code on all
-            // child contrainers and resets children's position to (0,0)
-       return;
-    }
-
-    MunkHtmlCell *nextCell;
-    long xpos = 0, ypos = m_IndentTop;
-    int xdelta = 0, ybasicpos = 0, ydiff;
-    int s_width, nextWordWidth, s_indent;
-    int ysizeup = 0, ysizedown = 0;
-    int MaxLineWidth = 0;
-    int curLineWidth = 0;
-    m_MaxTotalWidth = 0;
-    bool bIsFirstLine = true;
-
-    /*
-
-    WIDTH ADJUSTING :
-
-    */
-
-    if (m_WidthFloatUnits == MunkHTML_UNITS_PERCENT)
-    {
-        if (m_WidthFloat < 0) m_Width = (100 + m_WidthFloat) * w / 100;
-        else m_Width = m_WidthFloat * w / 100;
-    }
-    else
-    {
-        if (m_WidthFloat < 0) m_Width = w + m_WidthFloat;
-        else m_Width = m_WidthFloat;
-    }
-
-    if (m_Cells)
-    {
-        int l = (m_IndentLeft < 0) ? (-m_IndentLeft * m_Width / 100) : m_IndentLeft;
-        int r = (m_IndentRight < 0) ? (-m_IndentRight * m_Width / 100) : m_IndentRight;
-        for (MunkHtmlCell *cell = m_Cells; cell; cell = cell->GetNext())
-            cell->Layout(m_Width - (l + r));
-    }
-    if (IsInlineBlock()) {
-	    int maxWidth = 0;
-	    for (MunkHtmlCell *cell = m_Cells; cell; cell = cell->GetNext()) {
-		    int cell_width = cell->GetWidth();
-		    if (cell_width > maxWidth) {
-			    maxWidth = cell_width;
-		    }
-	    }
-	    m_Width = maxWidth;
-    }
-
-
-    /*
-
-    LAYOUTING :
-
-    */
-
-    // adjust indentation:
-    s_indent = (m_IndentLeft < 0) ? (-m_IndentLeft * m_Width / 100) : m_IndentLeft;
-    s_width = m_Width - s_indent - ((m_IndentRight < 0) ? (-m_IndentRight * m_Width / 100) : m_IndentRight);
-
-
-    if (m_IndentFirstLine != 0) {
-	    xpos = m_IndentFirstLine;
-    }
-
-
-
-    // my own layouting:
-    MunkHtmlCell *cell = m_Cells,
-               *line = m_Cells;
-    while (cell != NULL)
-    {
-        switch (m_AlignVer)
-        {
-            case MunkHTML_ALIGN_TOP :      ybasicpos = 0; break;
-            case MunkHTML_ALIGN_BOTTOM :   ybasicpos = - cell->GetHeight(); break;
-            case MunkHTML_ALIGN_CENTER :   ybasicpos = - cell->GetHeight() / 2; break;
-        }
-        ydiff = cell->GetHeight() + ybasicpos;
-
-        if (cell->GetDescent() + ydiff > ysizedown) ysizedown = cell->GetDescent() + ydiff;
-        if (ybasicpos + cell->GetDescent() < -ysizeup) ysizeup = - (ybasicpos + cell->GetDescent());
-
-        // layout nonbreakable run of cells:
-        cell->SetPos(xpos, ybasicpos + cell->GetDescent());
-
-        xpos += cell->GetWidth();
-
-        if (!cell->IsTerminalCell()
-	    && !cell->IsInlineBlock()) 
-        {
-            // Container cell indicates new line
-            if (curLineWidth > m_MaxTotalWidth)
-                m_MaxTotalWidth = curLineWidth;
-
-            if (wxMax(cell->GetWidth(), cell->GetMaxTotalWidth()) > m_MaxTotalWidth)
-                m_MaxTotalWidth = cell->GetMaxTotalWidth();
-            curLineWidth = 0;
-        }
-        else
-            // Normal cell, add maximum cell width to line width
-            curLineWidth += cell->GetMaxTotalWidth();
-
-        cell = cell->GetNext();
-
-        // compute length of the next word that would be added:
-        nextWordWidth = 0;
-        if (cell)
-        {
-            nextCell = cell;
-            do
-            {
-                nextWordWidth += nextCell->GetWidth();
-                nextCell = nextCell->GetNext();
-            } while (nextCell && !nextCell->IsLinebreakAllowed());
-        }
-
-        // force new line if occurred:
-        if ((cell == NULL) ||
-            ((xpos + nextWordWidth > s_width) && cell->IsLinebreakAllowed())
-	    || cell->ForceLineBreak())
-        {
-            if (xpos > MaxLineWidth) MaxLineWidth = xpos;
-            if (ysizeup < 0) ysizeup = 0;
-            if (ysizedown < 0) ysizedown = 0;
-	    if (IsInlineBlock()) {
-		    switch (m_AlignHor) {
-		    case MunkHTML_ALIGN_LEFT :
-		    case MunkHTML_ALIGN_JUSTIFY :
-			    xdelta = 0;
-			    break;
-		    case MunkHTML_ALIGN_RIGHT :
-			    xdelta = 0 + (s_width - xpos);
-			    break;
-		    case MunkHTML_ALIGN_CENTER :
-			    xdelta = 0 + (s_width - xpos) / 2;
-			    break;
-		    }
-	    } else {
-		    switch (m_AlignHor) {
-		    case MunkHTML_ALIGN_LEFT :
-		    case MunkHTML_ALIGN_JUSTIFY :
-			    xdelta = 0;
-			    break;
-		    case MunkHTML_ALIGN_RIGHT :
-			    xdelta = 0 + (s_width - xpos);
-			    break;
-		    case MunkHTML_ALIGN_CENTER :
-			    xdelta = 0 + (s_width - xpos) / 2;
-			    break;
-		    }
-	    }
-            if (xdelta < 0) xdelta = 0;
-	    if (!IsInlineBlock()) {
-		    xdelta += s_indent;
-	    }
-
-            ypos += ysizeup;
-
-            if (m_AlignHor != MunkHTML_ALIGN_JUSTIFY || cell == NULL)
-            {
-                while (line != cell)
-                {
-                    line->SetPos(line->GetPosX() + xdelta,
-                                   ypos + line->GetPosY());
-                    line = line->GetNext();
-                }
-            }
-            else // align == justify
-            {
-                // we have to distribute the extra horz space between the cells
-                // on this line
-
-                // an added complication is that some cells have fixed size and
-                // shouldn't get any increment (it so happens that these cells
-                // also don't allow line break on them which provides with an
-                // easy way to test for this) -- and neither should the cells
-                // adjacent to them as this could result in a visible space
-                // between two cells separated by, e.g. font change, cell which
-                // is wrong
-
-                int step = s_width - xpos;
-                if ( step > 0 )
-                {
-                    // first count the cells which will get extra space
-                    int total = -1;
-		    bool bIsLastLine = false;
-
-                    const MunkHtmlCell *c;
-                    if ( line != cell )
-                    {
-                        for ( c = line; c != cell; c = c->GetNext() )
-                        {
-                            if ( c->IsLinebreakAllowed() )
-                            {
-                                total++;
-                            }
-                        }
-
-			// This is a crude way of getting to know whether
-			// this is the last line, and it doesn't always
-			// work.
-			if (c == NULL) {
-			    bIsLastLine = true;
+	// VS: Any attempt to layout with negative or zero width leads to hell,
+	// but we can't ignore such attempts completely, since it sometimes
+	// happen (e.g. when trying how small a table can be). The best thing we
+	// can do is to set the width of child cells to zero
+	if (w < 1) {
+		m_Width = 0;
+		for (MunkHtmlCell *cell = m_Cells; cell; cell = cell->GetNext()) {
+			cell->Layout(0);
+		}
+		// this does two things: it recursively calls this code on all
+		// child contrainers and resets children's position to (0,0)
+		return;
+	}
+	
+	MunkHtmlCell *nextCell;
+	long xpos = 0;
+	long lineWidth = 0;
+	long ypos = m_IndentTop;
+	int xdelta = 0, ybasicpos = 0, ydiff;
+	int s_width, nextWordWidth, s_indent;
+	int ysizeup = 0, ysizedown = 0;
+	int MaxLineWidth = 0;
+	int curLineWidth = 0;
+	m_MaxTotalWidth = 0;
+	bool bIsFirstLine = true;
+	
+	/*
+	  
+	  WIDTH ADJUSTING :
+	  
+	*/
+	
+	if (m_WidthFloatUnits == MunkHTML_UNITS_PERCENT) {
+		if (m_WidthFloat < 0) {
+			m_Width = (100 + m_WidthFloat) * w / 100; 
+		} else {
+			m_Width = m_WidthFloat * w / 100;
+		}
+	} else {
+		if (m_WidthFloat < 0) {
+			m_Width = w + m_WidthFloat;
+		} else {
+			m_Width = m_WidthFloat;
+		}
+	}
+	
+	if (m_Cells) {
+		int l = (m_IndentLeft < 0) ? (-m_IndentLeft * m_Width / 100) : m_IndentLeft;
+		int r = (m_IndentRight < 0) ? (-m_IndentRight * m_Width / 100) : m_IndentRight;
+		for (MunkHtmlCell *cell = m_Cells; cell; cell = cell->GetNext()) {
+			cell->Layout(m_Width - (l + r));
+		}
+	}
+	if (IsInlineBlock()) {
+		int maxWidth = 0;
+		for (MunkHtmlCell *cell = m_Cells; cell; cell = cell->GetNext()) {
+			int cell_width = cell->GetWidth();
+			if (cell_width > maxWidth) {
+				maxWidth = cell_width;
 			}
-                    }
+		}
+		m_Width = maxWidth;
+	}
+	
+	
+	/*
+	  
+	  LAYOUTING :
+	  
+	*/
+	
+	// adjust indentation:
+	if (m_direction == MunkHTML_RTL) {
+		s_indent = (m_IndentRight < 0) ? (-m_IndentRight * m_Width / 100) : m_IndentRight;
+		s_width = m_Width - s_indent - ((m_IndentLeft < 0) ? (-m_IndentLeft * m_Width / 100) : m_IndentLeft);
+	} else {
+		s_indent = (m_IndentLeft < 0) ? (-m_IndentLeft * m_Width / 100) : m_IndentLeft;
+		s_width = m_Width - s_indent - ((m_IndentRight < 0) ? (-m_IndentRight * m_Width / 100) : m_IndentRight);
+	}
 
-		    // If this is the last line, don't do the justify thing.
-		    if (bIsLastLine) {
-		        total = 0;
-		    }
+	if (m_direction == MunkHTML_RTL) {
+		xpos = m_Width - s_indent;
+	} else {
+		xpos = 0;
+	}
 
-                    // and now extra space to those cells which merit it
-                    if ( total )
-                    {
-                        // first visible cell on line is not moved:
-                        while (line !=cell && !line->IsLinebreakAllowed())
-                        {
-                            line->SetPos(line->GetPosX() + s_indent,
-                                         line->GetPosY() + ypos);
-                            line = line->GetNext();
-                        }
 
-                        if (line != cell)
-                        {
-                            line->SetPos(line->GetPosX() + s_indent,
-                                         line->GetPosY() + ypos);
+	
+	if (m_IndentFirstLine != 0) {
+		if (m_direction == MunkHTML_RTL) {
+			xpos -= m_IndentFirstLine;
+		} else {
+			xpos += m_IndentFirstLine;
+		}
+		lineWidth += m_IndentFirstLine;
+	}
 
-                            line = line->GetNext();
-                        }
 
-                        for ( int n = 0; line != cell; line = line->GetNext() )
-                        {
-                            if ( line->IsLinebreakAllowed() )
-                            {
-                                // offset the next cell relative to this one
-                                // thus increasing our size
-                                n++;
-                            }
 
-                            line->SetPos(line->GetPosX() + s_indent +
-                                           ((n * step) / total),
-                                           line->GetPosY() + ypos);
-                        }
-                    }
-                    else
-                    {
-                        // this will cause the code to enter "else branch" below:
-                        step = 0;
-                    }
-                }
-                // else branch:
-                if ( step <= 0 ) // no extra space to distribute
-                {
-                    // just set the indent properly
-                    while (line != cell)
-                    {
-                        line->SetPos(line->GetPosX() + s_indent,
-                                     line->GetPosY() + ypos);
-                        line = line->GetNext();
-                    }
-                }
-            }
+	// my own layouting:
+	MunkHtmlCell *cell = m_Cells,
+		*line = m_Cells;
+	while (cell != NULL) {
+		switch (m_AlignVer) {
+		case MunkHTML_ALIGN_TOP :
+			ybasicpos = 0; 
+			break;
+		case MunkHTML_ALIGN_BOTTOM :
+			ybasicpos = - cell->GetHeight(); 
+			break;
+		case MunkHTML_ALIGN_CENTER :
+			ybasicpos = ((m_Height - (cell->GetHeight())) / 2) - cell->GetDescent();
+			break;
+		}
+		ydiff = cell->GetHeight() + ybasicpos;
 
-            ypos += ysizedown;
-            xpos = 0;
-            ysizeup = ysizedown = 0;
-            line = cell;
-	    bIsFirstLine = false;
-        }
-    }
+		if (cell->GetDescent() + ydiff > ysizedown) {
+			ysizedown = cell->GetDescent() + ydiff;
+		}
+		if (ybasicpos + cell->GetDescent() < -ysizeup) {
+			ysizeup = - (ybasicpos + cell->GetDescent());
+		}
 
-    // setup height & width, depending on container layout:
-    m_Height = ypos + (ysizedown + ysizeup) + m_IndentBottom;
-    m_Descent = 0;
+		// layout nonbreakable run of cells:
+		
+		if (m_direction == MunkHTML_RTL) {
+			xpos -= cell->GetWidth();
+			cell->SetPos(xpos, ybasicpos + cell->GetDescent());
+		} else {
+			cell->SetPos(xpos, ybasicpos + cell->GetDescent());
+			xpos += cell->GetWidth();
+		}
 
-    if (m_Height < m_MinHeight)
-    {
-        if (m_MinHeightAlign != MunkHTML_ALIGN_TOP)
-        {
-            int diff = m_MinHeight - m_Height;
-            if (m_MinHeightAlign == MunkHTML_ALIGN_CENTER) diff /= 2;
-            cell = m_Cells;
-            while (cell)
-            {
-                cell->SetPos(cell->GetPosX(), cell->GetPosY() + diff);
-                cell = cell->GetNext();
-            }
-        }
-        m_Height = m_MinHeight;
-    }
+		// xpos is distinct from lineWidth
+		lineWidth += cell->GetWidth();
 
-    if (curLineWidth > m_MaxTotalWidth)
-        m_MaxTotalWidth = curLineWidth;
 
-    m_MaxTotalWidth += s_indent + ((m_IndentRight < 0) ? (-m_IndentRight * m_Width / 100) : m_IndentRight);
-    MaxLineWidth += s_indent + ((m_IndentRight < 0) ? (-m_IndentRight * m_Width / 100) : m_IndentRight);
-    if (IsInlineBlock()) {
-	    m_Width = m_MaxTotalWidth;
-    } else {
-	    if (m_Width < MaxLineWidth) m_Width = MaxLineWidth;
-    }
+		if (!cell->IsTerminalCell()
+		    && !cell->IsInlineBlock()) {
+			// Container cell indicates new line
+			if (curLineWidth > m_MaxTotalWidth) {
+				m_MaxTotalWidth = curLineWidth;
+			}
 
-    m_LastLayout = w;
+			if (wxMax(cell->GetWidth(), cell->GetMaxTotalWidth()) > m_MaxTotalWidth) {
+				m_MaxTotalWidth = cell->GetMaxTotalWidth();
+				curLineWidth = 0;
+			}
+		} else {
+			// Normal cell, add maximum cell width to line width
+			curLineWidth += cell->GetMaxTotalWidth();
+		}
+
+		cell = cell->GetNext();
+	
+		// compute length of the next word that would be added:
+		nextWordWidth = 0;
+		if (cell) {
+			nextCell = cell;
+			do {
+				nextWordWidth += nextCell->GetWidth();
+				nextCell = nextCell->GetNext();
+			} while (nextCell && !nextCell->IsLinebreakAllowed());
+		}
+
+		// force new line if occurred:
+		if ((cell == NULL) ||
+		    ((lineWidth + nextWordWidth > s_width) && cell->IsLinebreakAllowed())
+		    || cell->ForceLineBreak()) {
+			if (lineWidth > MaxLineWidth) {
+				MaxLineWidth = lineWidth;
+			}
+			if (ysizeup < 0) {
+				ysizeup = 0; 
+			}
+			if (ysizedown < 0) {
+				ysizedown = 0;
+			}
+			if (IsInlineBlock()) {
+				switch (m_AlignHor) {
+				case MunkHTML_ALIGN_LEFT :
+				case MunkHTML_ALIGN_JUSTIFY :
+					xdelta = 0;
+					break;
+				case MunkHTML_ALIGN_RIGHT :
+					xdelta = 0 + (s_width - lineWidth);
+					break;
+				case MunkHTML_ALIGN_CENTER :
+					xdelta = 0 + (s_width - lineWidth) / 2;
+					break;
+				}
+			} else {
+				if (m_direction == MunkHTML_RTL) {
+					switch (m_AlignHor) {
+					case MunkHTML_ALIGN_LEFT :
+					case MunkHTML_ALIGN_JUSTIFY :
+						xdelta = 0 + (s_width - lineWidth);
+					break;
+					case MunkHTML_ALIGN_RIGHT :
+						xdelta = 0;
+						break;
+					case MunkHTML_ALIGN_CENTER :
+						xdelta = 0 + (s_width - lineWidth) / 2;
+						break;
+					}
+				} else {
+					switch (m_AlignHor) {
+					case MunkHTML_ALIGN_LEFT :
+					case MunkHTML_ALIGN_JUSTIFY :
+						xdelta = 0;
+					break;
+					case MunkHTML_ALIGN_RIGHT :
+						xdelta = 0 + (s_width - lineWidth);
+						break;
+					case MunkHTML_ALIGN_CENTER :
+						xdelta = 0 + (s_width - lineWidth) / 2;
+						break;
+					}
+				}
+			}
+			if (!IsInlineBlock()) {
+				if (m_direction == MunkHTML_RTL) {
+					xdelta -= s_indent;
+				} else {
+					xdelta += s_indent;
+				}
+			}
+
+			if (xdelta < 0) {
+				xdelta = 0;
+			}
+
+			ypos += ysizeup;
+
+
+			if (m_AlignHor != MunkHTML_ALIGN_JUSTIFY || cell == NULL) {
+				while (line != cell) {
+					line->SetPos(line->GetPosX() + xdelta,
+						     ypos + line->GetPosY());
+					line = line->GetNext();
+				}
+			} else {
+				// align == justify
+				// we have to distribute the extra horz space between the cells
+				// on this line
+					
+				// an added complication is that some cells have fixed size and
+				// shouldn't get any increment (it so happens that these cells
+				// also don't allow line break on them which provides with an
+				// easy way to test for this) -- and neither should the cells
+				// adjacent to them as this could result in a visible space
+				// between two cells separated by, e.g. font change, cell which
+				// is wrong
+					
+				int step = s_width - lineWidth;
+				if ( step > 0 ) {
+					// first count the cells which will get extra space
+					int total = -1;
+					bool bIsLastLine = false;
+						
+					const MunkHtmlCell *c;
+					if ( line != cell ) {
+						for ( c = line; c != cell; c = c->GetNext() ) {
+							if ( c->IsLinebreakAllowed() ) {
+								total++;
+							}
+						}
+							
+						// This is a crude way of getting to know whether
+						// this is the last line, and it doesn't always
+						// work.
+						if (c == NULL) {
+							bIsLastLine = true;
+						}
+					}
+						
+					// If this is the last line, don't do the justify thing.
+					if (bIsLastLine) {
+						total = 0;
+					}
+						
+					// and now extra space to those cells which merit it
+					if ( total ) {
+						// first visible cell on line is not moved:
+						while (line !=cell && !line->IsLinebreakAllowed()) {
+							line->SetPos(line->GetPosX() + s_indent,
+								     line->GetPosY() + ypos);
+							line = line->GetNext();
+						}
+							
+						if (line != cell) {
+							line->SetPos(line->GetPosX() + s_indent,
+								     line->GetPosY() + ypos);
+								
+							line = line->GetNext();
+						}
+							
+						for ( int n = 0; line != cell; line = line->GetNext() ) {
+							if ( line->IsLinebreakAllowed() ) {
+								// offset the next cell relative to this one
+								// thus increasing our size
+								n++;
+							}
+								
+							line->SetPos(line->GetPosX() + s_indent +
+								     ((n * step) / total),
+								     line->GetPosY() + ypos);
+						}
+					} else {
+						// this will cause the code to enter "else branch" below:
+						step = 0;
+					}
+				}
+				// else branch:
+				if ( step <= 0 ) {
+					// no extra space to distribute
+					// just set the indent properly
+					while (line != cell) {
+						line->SetPos(line->GetPosX() + s_indent,
+							     line->GetPosY() + ypos);
+						line = line->GetNext();
+					}
+				}
+			}
+				
+			ypos += ysizedown;
+			lineWidth = 0;
+			if (m_direction == MunkHTML_RTL) {
+				xpos = m_Width - s_indent;
+			} else {
+				xpos = 0;
+			}
+			ysizeup = ysizedown = 0;
+			line = cell;
+			bIsFirstLine = false;
+		}
+	}
+
+	// setup height & width, depending on container layout:
+	if (m_DeclaredHeight >= 0) {
+		m_Height = m_DeclaredHeight;
+	} else {
+		m_Height = ypos + (ysizedown + ysizeup) + m_IndentBottom;
+	}
+	m_Descent = 0;
+		
+	if (m_Height < m_MinHeight) {
+		if (m_MinHeightAlign != MunkHTML_ALIGN_TOP) {
+			int diff = m_MinHeight - m_Height;
+			if (m_MinHeightAlign == MunkHTML_ALIGN_CENTER) {
+				diff /= 2;
+			}
+			cell = m_Cells;
+			while (cell) {
+				cell->SetPos(cell->GetPosX(), cell->GetPosY() + diff);
+				cell = cell->GetNext();
+			}
+		}
+		m_Height = m_MinHeight;
+	}
+		
+	if (curLineWidth > m_MaxTotalWidth) {
+		m_MaxTotalWidth = curLineWidth;
+	}
+
+	m_MaxTotalWidth += s_indent + ((m_IndentRight < 0) ? (-m_IndentRight * m_Width / 100) : m_IndentRight);
+	MaxLineWidth += s_indent + ((m_IndentRight < 0) ? (-m_IndentRight * m_Width / 100) : m_IndentRight);
+	if (IsInlineBlock()) {
+		m_Width = m_MaxTotalWidth;
+	} else {
+		if (m_Width < MaxLineWidth) {
+			m_Width = MaxLineWidth;
+		}
+	}
+		
+	m_LastLayout = w;
 }
-
+	
 void MunkHtmlContainerCell::UpdateRenderingStatePre(MunkHtmlRenderingInfo& info,
                                                   MunkHtmlCell *cell) const
 {
@@ -3309,29 +3736,180 @@ void MunkHtmlContainerCell::Draw(wxDC& dc, int x, int y, int view_y1, int view_y
     int xlocal = x + m_PosX;
     int ylocal = y + m_PosY;
 
-    if (m_UseBkColour)
+    if (m_UseBkColour || m_bmpBg.Ok())
     {
-        wxBrush myb = wxBrush(m_BkColour, wxSOLID);
-
-        int real_y1 = mMax(ylocal, view_y1);
-        int real_y2 = mMin(ylocal + m_Height - 1, view_y2);
-
-        dc.SetBrush(myb);
-        dc.SetPen(*wxTRANSPARENT_PEN);
-        dc.DrawRectangle(xlocal, real_y1, m_Width, real_y2 - real_y1 + 1);
+	    wxColour colorToUse;
+	    if (m_UseBkColour) {
+		    colorToUse = m_BkColour;
+	    } else {
+		    colorToUse = *wxWHITE; // Default to white. FIXME: Default to the bgcolor of the MunkHtmlWindow.
+	    }
+	    wxBrush myb = wxBrush(colorToUse, wxSOLID);
+	    
+	    int real_y1 = mMax(ylocal, view_y1);
+	    int real_y2 = mMin(ylocal + m_Height - 1, view_y2);
+	    
+	    dc.SetBrush(myb);
+	    dc.SetPen(*wxTRANSPARENT_PEN);
+	    dc.DrawRectangle(xlocal, real_y1, m_Width, real_y2 - real_y1 + 1);
     }
 
-    if (m_UseBorder)
-    {
-        wxPen mypen1(m_BorderColour1, 1, wxSOLID);
-        wxPen mypen2(m_BorderColour2, 1, wxSOLID);
+    // Do we do background image?
+    if (m_bmpBg.Ok()) {
+	    // Yes, we do background image.
 
-        dc.SetPen(mypen1);
-        dc.DrawLine(xlocal, ylocal, xlocal, ylocal + m_Height - 1);
-        dc.DrawLine(xlocal, ylocal, xlocal + m_Width, ylocal);
-        dc.SetPen(mypen2);
-        dc.DrawLine(xlocal + m_Width - 1, ylocal, xlocal +  m_Width - 1, ylocal + m_Height - 1);
-        dc.DrawLine(xlocal, ylocal + m_Height - 1, xlocal + m_Width, ylocal + m_Height - 1);
+	    // We have already erased the background above.
+	    // Now do the bitmap.
+	    const wxSize sizeContainerCell(m_Width, m_Height);
+	    const wxSize sizeBmp(m_bmpBg.GetWidth(), m_bmpBg.GetHeight());
+	    wxRect rect = wxRect(0,
+				 0, 
+				 sizeContainerCell.GetWidth(), 
+				 sizeContainerCell.GetHeight());
+
+	    wxMemoryDC *pDCM = new wxMemoryDC();
+	    wxBitmap *pBackBitmap = new wxBitmap(sizeContainerCell.GetWidth(), 
+						 sizeContainerCell.GetHeight());
+	    pDCM->SelectObject(*pBackBitmap);
+
+	    // PrepareDC(dcm);
+
+	    wxColour colorToUse;
+	    if (m_UseBkColour) {
+		    colorToUse = m_BkColour;
+	    } else {
+		    colorToUse = *wxWHITE; // Default to white. FIXME: Default to the bgcolor of the MunkHtmlWindow.
+	    }
+	    wxBrush myb = wxBrush(colorToUse, wxSOLID);
+	    
+	    pDCM->SetBrush(myb);
+	    pDCM->SetPen(*wxTRANSPARENT_PEN);
+	    pDCM->DrawRectangle(0, 0, sizeContainerCell.GetWidth(), sizeContainerCell.GetHeight());
+	    
+	    pDCM->SetMapMode(wxMM_TEXT);
+	    pDCM->SetBackgroundMode(wxTRANSPARENT);
+
+	    if (m_nBackgroundRepeat == MunkHTML_BACKGROUND_REPEAT_NO_REPEAT) {
+		    pDCM->DrawBitmap(m_bmpBg, 0, 0, true /* use mask */);
+	    } else if (m_nBackgroundRepeat == MunkHTML_BACKGROUND_REPEAT_REPEAT_X) {
+		    wxCoord bmpy = 0;
+		    for ( wxCoord bmpx = 0; bmpx < sizeContainerCell.x; bmpx += sizeBmp.x ) {
+			    pDCM->DrawBitmap(m_bmpBg, bmpx,bmpy, true /* use mask */);
+		    }
+	    } else if (m_nBackgroundRepeat == MunkHTML_BACKGROUND_REPEAT_REPEAT_Y) {
+		    wxCoord bmpx = 0;
+		    for ( wxCoord bmpy = 0;bmpy < sizeContainerCell.y;bmpy += sizeBmp.y ) {
+			    pDCM->DrawBitmap(m_bmpBg, bmpx,bmpy, true /* use mask */);
+		    }
+	    } else {
+		    // m_nBackgroundRepeat == MunkHTML_BACKGROUND_REPEAT_REPEAT
+		    for ( wxCoord bmpx = 0; bmpx < sizeContainerCell.x; bmpx += sizeBmp.x ) {
+			    for ( wxCoord bmpy = 0;bmpy < sizeContainerCell.y;bmpy += sizeBmp.y ) {
+				    pDCM->DrawBitmap(m_bmpBg, bmpx,bmpy, true /* use mask */);
+			    }
+		    }
+	    }
+
+	    pDCM->SetDeviceOrigin(0,0);
+	    //dc.SetDeviceOrigin(0,0);
+	    //dc.DestroyClippingRegion();
+
+	    dc.Blit(xlocal, ylocal, // xdest, ydest
+		    sizeContainerCell.GetWidth(),  // width
+		    sizeContainerCell.GetHeight(), // height
+		    pDCM, // source
+		    0, 0); // xsource, ysource
+
+	    delete pDCM;
+	    
+	    delete pBackBitmap;
+    }
+
+
+    if (m_bUseBorder) {
+	    switch (m_BorderStyleTop) {
+	    case MunkHTML_BORDER_STYLE_NONE: 
+		    break;
+	    case MunkHTML_BORDER_STYLE_SOLID: 
+		    {
+			    wxPen mypen1(m_BorderColour1Top, m_BorderWidthTop, wxSOLID);
+			    dc.SetPen(mypen1);
+			    dc.DrawLine(xlocal, ylocal, xlocal + m_Width, ylocal);
+			    break;
+		    }
+	    case MunkHTML_BORDER_STYLE_OUTSET: 
+		    {
+			    wxPen mypen1(m_BorderColour1Top, m_BorderWidthTop, wxSOLID);
+			    dc.SetPen(mypen1);
+			    dc.DrawLine(xlocal, ylocal, xlocal + m_Width, ylocal);
+			    break;
+		    }
+	    }
+
+	    switch (m_BorderStyleRight) {
+	    case MunkHTML_BORDER_STYLE_NONE: 
+		    break;
+	    case MunkHTML_BORDER_STYLE_SOLID: 
+		    {
+			    wxPen mypen1(m_BorderColour1Right, m_BorderWidthRight, wxSOLID);
+			    dc.SetPen(mypen1);
+			    dc.DrawLine(xlocal + m_Width - 1, ylocal, xlocal +  m_Width - 1, ylocal + m_Height - 1);
+			    break;
+		    }
+	    case MunkHTML_BORDER_STYLE_OUTSET: 
+		    {
+			    wxPen mypen2(m_BorderColour2Right, m_BorderWidthRight, wxSOLID);
+			    dc.SetPen(mypen2);
+			    dc.DrawLine(xlocal + m_Width - 1, ylocal, xlocal +  m_Width - 1, ylocal + m_Height - 1);
+			    break;
+		    }
+	    }
+
+	    switch (m_BorderStyleBottom) {
+	    case MunkHTML_BORDER_STYLE_NONE: 
+		    break;
+	    case MunkHTML_BORDER_STYLE_SOLID: 
+		    {
+			    wxPen mypen1(m_BorderColour1Bottom, m_BorderWidthBottom, wxSOLID);
+			    dc.SetPen(mypen1);
+			    dc.DrawLine(xlocal, ylocal + m_Height - 1, xlocal + m_Width, ylocal + m_Height - 1);
+			    break;
+		    }
+	    case MunkHTML_BORDER_STYLE_OUTSET: 
+		    {
+			    wxPen mypen2(m_BorderColour2Bottom, m_BorderWidthBottom, wxSOLID);
+			    dc.SetPen(mypen2);
+			    dc.DrawLine(xlocal, ylocal + m_Height - 1, xlocal + m_Width, ylocal + m_Height - 1);
+			    break;
+		    }
+	    }
+
+	    switch (m_BorderStyleLeft) {
+	    case MunkHTML_BORDER_STYLE_NONE: 
+		    break;
+	    case MunkHTML_BORDER_STYLE_SOLID: 
+		    {
+			    wxPen mypen1(m_BorderColour1Left, m_BorderWidthLeft, wxSOLID);
+			    dc.SetPen(mypen1);
+			    dc.DrawLine(xlocal, ylocal, xlocal, ylocal + m_Height - 1);
+			    break;
+		    }
+	    case MunkHTML_BORDER_STYLE_OUTSET: 
+		    {
+			    wxPen mypen1(m_BorderColour1Left, m_BorderWidthLeft, wxSOLID);
+			    dc.SetPen(mypen1);
+			    dc.DrawLine(xlocal, ylocal, xlocal, ylocal + m_Height - 1);
+
+			    break;
+		    }
+	    }
+
+	    //dc.SetPen(mypen1);
+	    //dc.DrawLine(xlocal, ylocal, xlocal + m_Width, ylocal);
+	    //dc.DrawLine(xlocal, ylocal, xlocal, ylocal + m_Height - 1);
+	    //dc.SetPen(mypen2);
+	    //dc.DrawLine(xlocal + m_Width - 1, ylocal, xlocal +  m_Width - 1, ylocal + m_Height - 1);
+	    //dc.DrawLine(xlocal, ylocal + m_Height - 1, xlocal + m_Width, ylocal + m_Height - 1);
     }
 
     if (m_Cells)
@@ -3445,6 +4023,31 @@ void MunkHtmlContainerCell::SetAlign(const MunkHtmlTag& tag)
 	}
 }
 
+void MunkHtmlContainerCell::SetVAlign(const MunkHtmlTag& tag)
+{
+	wxString alg;
+	if (tag.HasParam(wxT("VALIGN"))) {
+		alg = tag.GetParam(wxT("VALIGN"));
+	} else if (tag.HasParam(wxT("VERTICAL_ALIGN"))) {
+		alg = tag.GetParam(wxT("VERTICAL_ALIGN"));
+	}
+
+	if (!alg.IsEmpty()) {
+		alg.MakeUpper();
+		if (alg == wxT("CENTER")) {
+			SetAlignVer(MunkHTML_ALIGN_CENTER);
+		} else if (alg == wxT("TOP")) {
+			SetAlignVer(MunkHTML_ALIGN_TOP);
+		} else if (alg == wxT("BOTTOM")) {
+			SetAlignVer(MunkHTML_ALIGN_BOTTOM);
+		} else {
+			SetAlignVer(MunkHTML_ALIGN_BOTTOM);
+		}
+	} else {
+		SetAlignVer(MunkHTML_ALIGN_BOTTOM);
+	}
+}
+
 
 
 void MunkHtmlContainerCell::SetWidthFloat(const MunkHtmlTag& tag, double pixel_scale)
@@ -3454,19 +4057,111 @@ void MunkHtmlContainerCell::SetWidthFloat(const MunkHtmlTag& tag, double pixel_s
         int wdi;
         wxString wd = tag.GetParam(wxT("WIDTH"));
 
-        if (wd[wd.length()-1] == wxT('%'))
-        {
-            wxSscanf(wd.c_str(), wxT("%i%%"), &wdi);
-            SetWidthFloat(wdi, MunkHTML_UNITS_PERCENT);
-        }
-        else
-        {
-            wxSscanf(wd.c_str(), wxT("%i"), &wdi);
-            SetWidthFloat((int)(pixel_scale * (double)wdi), MunkHTML_UNITS_PIXELS);
-
+        if (wd[wd.length()-1] == wxT('%')) {
+		wxSscanf(wd.c_str(), wxT("%i%%"), &wdi);
+		SetWidthFloat(wdi, MunkHTML_UNITS_PERCENT);
+        } else if (wd.length() > 2 && wd.Right(2) == wxT("px")) {
+		wxSscanf(wd.c_str(), wxT("%ipx"), &wdi);
+		SetWidthFloat((int)(pixel_scale * (double)wdi), MunkHTML_UNITS_PIXELS);
+	} else {
+		wxSscanf(wd.c_str(), wxT("%i"), &wdi);
+		SetWidthFloat((int)(pixel_scale * (double)wdi), MunkHTML_UNITS_PIXELS);
+		
         }
         m_LastLayout = -1;
     }
+}
+
+
+void MunkHtmlContainerCell::SetHeight(const MunkHtmlTag& tag, double pixel_scale)
+{
+    if (tag.HasParam(wxT("HEIGHT")))
+    {
+        int wdi;
+        wxString wd = tag.GetParam(wxT("HEIGHT"));
+
+	if (wd.Right(2) == wxT("PX")) {
+		wd = wd.Left(wd.Length() - 2);
+	}
+
+	wxSscanf(wd.c_str(), wxT("%i"), &wdi);
+	SetDeclaredHeight(((int)(pixel_scale * (double)wdi)));
+
+        m_LastLayout = -1;
+    }
+}
+
+void MunkHtmlContainerCell::SetBorder(const wxColour& clr1, const wxColour& clr2) 
+{
+	m_bUseBorder = true;
+	SetBorder(MunkHTML_BORDER_TOP, MunkHTML_BORDER_STYLE_SOLID, 1, clr1);
+	m_BorderColour1Top = clr1, m_BorderColour2Top = clr2;
+	m_BorderColour1Right = clr1, m_BorderColour2Right = clr2;
+	m_BorderColour1Bottom = clr1, m_BorderColour2Bottom = clr2;
+	m_BorderColour1Left = clr1, m_BorderColour2Left = clr2;
+}
+
+
+void MunkHtmlContainerCell::SetBorder(MunkHtmlBorderDirection direction, MunkHtmlBorderStyle style, int border_width, const wxColour& set_clr1, const wxColour& set_clr2)
+{
+	wxColour clr1 = set_clr1;
+	wxColour clr2 = set_clr2;
+	switch (style) {
+	case MunkHTML_BORDER_STYLE_NONE:
+		break;
+	case MunkHTML_BORDER_STYLE_SOLID:
+		clr2 = set_clr1;
+		m_bUseBorder = true;
+		break;
+	case MunkHTML_BORDER_STYLE_OUTSET: {
+		if (set_clr2 == wxNullColour) {
+			int r, g, b;
+			r = clr1.Red();
+			g = clr1.Green();
+			b = clr1.Blue();
+			r = ( r * 4 ) / 3;
+			r = ( r > 255 ) ? 255 : r;
+			
+			g = ( g * 4 ) / 3;
+			g = ( g > 255 ) ? 255 : g;
+			
+			b = ( b * 4 ) / 3;
+			b = ( b > 255 ) ? 255 : b;
+			
+			clr2 = wxColour(r,g,b);
+		} else {
+			clr2 = set_clr2;
+		}
+		m_bUseBorder = true;
+		break;
+	}
+	}
+	switch (direction) {
+	case MunkHTML_BORDER_TOP:
+		m_BorderStyleTop = style;
+		m_BorderWidthTop = border_width;
+		m_BorderColour1Top = clr1;
+		m_BorderColour2Top = clr2;
+		break;
+	case MunkHTML_BORDER_RIGHT:
+		m_BorderStyleRight = style;
+		m_BorderWidthRight = border_width;
+		m_BorderColour1Right = clr1;
+		m_BorderColour2Right = clr2;
+		break;
+	case MunkHTML_BORDER_BOTTOM:
+		m_BorderStyleBottom = style;
+		m_BorderWidthBottom = border_width;
+		m_BorderColour1Bottom = clr1;
+		m_BorderColour2Bottom = clr2;
+		break;
+	case MunkHTML_BORDER_LEFT:
+		m_BorderStyleLeft = style;
+		m_BorderWidthLeft = border_width;
+		m_BorderColour1Left = clr1;
+		m_BorderColour2Left = clr2;
+		break;
+	}
 }
 
 
@@ -3798,11 +4493,12 @@ BEGIN_EVENT_TABLE(MunkHtmlButtonPanel, wxPanel)
     EVT_BUTTON(wxID_ANY, MunkHtmlButtonPanel::OnButtonClicked)
 END_EVENT_TABLE()
 
-MunkHtmlButtonPanel::MunkHtmlButtonPanel(MunkHtmlWindow *pParent, int id, const wxString& strLabel, form_id_t form_id, wxSize size)
+MunkHtmlButtonPanel::MunkHtmlButtonPanel(MunkHtmlWindow *pParent, int id, const wxString& strLabel, form_id_t form_id, wxSize size, const std::string& name)
 : wxPanel(pParent, id),
 	m_form_id(form_id),
 	m_strLabel(strLabel),
-	m_pParent(pParent)
+	m_pParent(pParent),
+	m_name(name)
 {
 	wxBoxSizer *pSizer = new wxBoxSizer(wxVERTICAL);
 	m_pButton = new wxButton(this, wxID_ANY, strLabel, wxDefaultPosition, size);
@@ -3837,9 +4533,10 @@ void MunkHtmlButtonPanel::OnButtonClicked(wxCommandEvent& event)
 
 
 
-MunkHtmlRadioBoxPanel::MunkHtmlRadioBoxPanel(bool bEnable, int selection, wxWindow* parent, wxWindowID id, const wxString& label, const wxPoint& point , const wxSize& size, const wxArrayString& choices, int majorDimension, long style)
+MunkHtmlRadioBoxPanel::MunkHtmlRadioBoxPanel(bool bEnable, int selection, wxWindow* parent, wxWindowID id, const wxString& label, const wxPoint& point , const wxSize& size, const wxArrayString& choices, int majorDimension, long style, const std::string& name)
 	: wxPanel(parent, id)
 {
+	m_name = name;
 	wxBoxSizer *pSizer = new wxBoxSizer(wxVERTICAL);
 	m_pRadioBox = new wxRadioBox(this, wxID_ANY, label, point, size, choices, majorDimension, style);
 	m_pRadioBox->Enable(bEnable);
@@ -3870,11 +4567,12 @@ END_EVENT_TABLE()
 
 
 
-MunkHtmlTextInputPanel::MunkHtmlTextInputPanel(bool bEnable, int size_in_chars, int maxlength, form_id_t form_id, const wxString& value, MunkHtmlWindow *pParent, wxWindowID id, const wxPoint& point , const wxSize& size, long style, bool bSubmitOnEnter)
+MunkHtmlTextInputPanel::MunkHtmlTextInputPanel(bool bEnable, int size_in_chars, int maxlength, form_id_t form_id, const wxString& value, MunkHtmlWindow *pParent, wxWindowID id, const wxPoint& point , const wxSize& size, long style, bool bSubmitOnEnter, const std::string& name)
 : wxPanel(pParent, id, wxDefaultPosition, wxDefaultSize, style),
 	  m_pParent(pParent),
 	  m_bSubmitOnEnter(bSubmitOnEnter),
-	  m_form_id(form_id)
+	m_form_id(form_id),
+	m_name(name)
 {
 	wxBoxSizer *pSizer = new wxBoxSizer(wxVERTICAL);
 	m_pTextCtrl = new wxTextCtrl(this, wxID_ANY, value, point, size, style|wxTE_PROCESS_ENTER);
@@ -3920,11 +4618,12 @@ BEGIN_EVENT_TABLE(MunkHtmlComboBoxPanel, wxPanel)
     EVT_COMBOBOX(wxID_ANY, MunkHtmlComboBoxPanel::OnSelect)
 END_EVENT_TABLE()
 
-MunkHtmlComboBoxPanel::MunkHtmlComboBoxPanel(int selection, MunkHtmlWindow* parent, wxWindowID id, const wxString& label, const wxPoint& point , const wxSize& size, const wxArrayString& choices, long style, form_id_t form_id, bool bSubmitOnSelect)
+MunkHtmlComboBoxPanel::MunkHtmlComboBoxPanel(int selection, MunkHtmlWindow* parent, wxWindowID id, const wxString& label, const wxPoint& point, const wxSize& size, const wxArrayString& choices, long style, form_id_t form_id, bool bSubmitOnSelect, const std::string& name)
 : wxPanel(parent, id),
 	m_form_id(form_id),
 	m_pParent(parent),
-	m_bSubmitOnSelect(bSubmitOnSelect)
+	m_bSubmitOnSelect(bSubmitOnSelect),
+	m_name(name)
 {
 	wxBoxSizer *pSizer = new wxBoxSizer(wxHORIZONTAL);
 	m_pComboBox = new wxComboBox(this, wxID_ANY, label, point, size, choices, style);
@@ -3953,7 +4652,7 @@ void MunkHtmlComboBoxPanel::OnSelect(wxCommandEvent& event)
 {
 	if (m_bSubmitOnSelect) {
 		wxCommandEvent event2(MunkEVT_COMMAND_HTML_FORM_SUBMITTED);
-		event2.SetString(wxString(wxT("ComboBox")));
+		event2.SetString(wxString(m_name.c_str(), wxConvUTF8));
 		event2.SetInt(m_form_id);
 		
 		::wxPostEvent(m_pParent, event2);
@@ -4134,14 +4833,14 @@ const MunkHtmlCell* MunkHtmlCellsIterator::operator++()
 			if ( !m_pos ) {
 				// If we got the root, return NULL.
 #ifdef __LINUX__
-				std::cerr << "UP251!" << std::endl;
+				//std::cerr << "UP251!" << std::endl;
 #endif
 				return NULL;
 			}
 		}
 
 #ifdef __LINUX__
-		std::cerr << "UP252!";
+		// std::cerr << "UP252!";
 #endif
 
 		m_pos = m_pos->GetNext();
@@ -4154,9 +4853,9 @@ const MunkHtmlCell* MunkHtmlCellsIterator::operator++()
 
 #ifdef __LINUX__
 	if (m_pos != 0) {
-		std::cerr << "m_pos = '" << std::string((const char*)m_pos->toString().ToUTF8()) << "'\n";
+		// std::cerr << "m_pos = '" << std::string((const char*)m_pos->toString().ToUTF8()) << "'\n";
 	} else {
-		std::cerr << "m_pos = NULL" << std::endl;
+		// std::cerr << "m_pos = NULL" << std::endl;
 	}
 #endif
 	return m_pos;
@@ -5013,9 +5712,6 @@ wxString MunkHtmlWindow::DoSelectionToHtml(MunkHtmlSelection *sel)
 	
 	while ( i ) {
 		text << i->toString();
-#ifdef __LINUX__
-		std::cerr << "UP240: i->toString() = '" << std::string((const char*) i->toString().ToUTF8()) << "'" << std::endl;
-#endif
 		++i;
 	}
 	return text;
@@ -5070,17 +5766,17 @@ bool MunkHtmlWindow::CopySelection(ClipboardType t, ClipboardOutputType cot)
 {
 #if wxUSE_CLIPBOARD
 #ifdef __LINUX__
-	std::cerr << "UP210: MunkHtmlWindow::CopySelection" << std::endl;
+	// std::cerr << "UP210: MunkHtmlWindow::CopySelection" << std::endl;
 #endif
 	if ( m_selection ) {
 #ifdef __LINUX__
-		std::cerr << "UP211: MunkHtmlWindow::CopySelection" << std::endl;
+		// std::cerr << "UP211: MunkHtmlWindow::CopySelection" << std::endl;
 #endif
 #if defined(__UNIX__) && !defined(__WXMAC__)
 		wxTheClipboard->UsePrimarySelection(t == Primary);
 #else // !__UNIX__
 #ifdef __LINUX__
-		std::cerr << "UP212: MunkHtmlWindow::CopySelection" << std::endl;
+		// std::cerr << "UP212: MunkHtmlWindow::CopySelection" << std::endl;
 #endif
 		// Primary selection exists only under X11, so don't do anything under
 		// the other platforms when we try to access it
@@ -5090,12 +5786,12 @@ bool MunkHtmlWindow::CopySelection(ClipboardType t, ClipboardOutputType cot)
 			return false;
 #endif // __UNIX__/!__UNIX__
 #ifdef __LINUX__
-		std::cerr << "UP213: MunkHtmlWindow::CopySelection" << std::endl;
+		// std::cerr << "UP213: MunkHtmlWindow::CopySelection" << std::endl;
 #endif
 		
 		if (cot == kCOTText) {
 #ifdef __LINUX__
-		  std::cerr << "UP220: MunkHtmlWindow::CopySelection" << std::endl;
+			// std::cerr << "UP220: MunkHtmlWindow::CopySelection" << std::endl;
 #endif
 			if ( wxTheClipboard->Open() ) {
 				const wxString txt(SelectionToText());
@@ -5110,29 +5806,29 @@ bool MunkHtmlWindow::CopySelection(ClipboardType t, ClipboardOutputType cot)
 			}
 		} else {
 #ifdef __LINUX__
-			std::cerr << "UP230: MunkHtmlWindow::CopySelection" << std::endl;
+			// std::cerr << "UP230: MunkHtmlWindow::CopySelection" << std::endl;
 #endif
 			if ( wxTheClipboard->Open() ) {
 				bool bResult = false;
 #ifdef __LINUX__
-				std::cerr << "UP231: MunkHtmlWindow::CopySelection" << std::endl;
+				// std::cerr << "UP231: MunkHtmlWindow::CopySelection" << std::endl;
 #endif
 				const wxString htmlFragment = wxT("<html><body>") + SelectionToHtml() + wxT("</body></html>");
 				
 				wxDataObjectSimple *pDataObj = new wxDataObjectSimple(wxDF_HTML);
 				bool bResult2 = pDataObj->SetData(htmlFragment.Length() + 1, ((const void*) htmlFragment.ToUTF8()));
 #ifdef __LINUX__
-				std::cerr << "UP231.5: MunkHtmlWindow::CopySelection: bResult2 = " << bResult2 << std::endl;
+				// std::cerr << "UP231.5: MunkHtmlWindow::CopySelection: bResult2 = " << bResult2 << std::endl;
 #endif
 				bResult = wxTheClipboard->SetData(pDataObj);
 				wxTheClipboard->Close();
 #ifdef __LINUX__
-				std::cerr << "UP232: MunkHtmlWindow::CopySelection: bResult = " << bResult << std::endl;
+				// std::cerr << "UP232: MunkHtmlWindow::CopySelection: bResult = " << bResult << std::endl;
 #endif
 				return bResult;
 			} else {
 #ifdef __LINUX__
-				std::cerr << "UP234: MunkHtmlWindow::CopySelection" << std::endl;
+				// std::cerr << "UP234: MunkHtmlWindow::CopySelection" << std::endl;
 #endif
 				return false;
 			}
@@ -5242,7 +5938,6 @@ void MunkHtmlWindow::OnPaint(wxPaintEvent& WXUNUSED(event))
 
     wxSize sz = GetSize();
     wxRect rect = wxRect(0,0, sz.x, sz.y);
-
 
     wxMemoryDC dcm;
     if ( !m_backBuffer )
@@ -5918,8 +6613,9 @@ MunkHtmlTableCell::MunkHtmlTableCell(MunkHtmlContainerCell *parent, const MunkHt
     m_Spacing = (int)(m_PixelScale * (double)m_Spacing);
     m_Padding = (int)(m_PixelScale * (double)m_Padding);
 
-    if (m_HasBorders)
+    if (m_HasBorders) {
         SetBorder(TABLE_BORDER_CLR_1, TABLE_BORDER_CLR_2);
+    }
 }
 
 
@@ -6111,11 +6807,15 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
         else
             valign = m_tValign;
         valign.MakeUpper();
-        if (valign == wxT("TOP"))
-            m_CellInfo[r][c].valign = MunkHTML_ALIGN_TOP;
-        else if (valign == wxT("BOTTOM"))
-            m_CellInfo[r][c].valign = MunkHTML_ALIGN_BOTTOM;
-        else m_CellInfo[r][c].valign = MunkHTML_ALIGN_CENTER;
+        if (valign == wxT("TOP")) {
+		m_CellInfo[r][c].valign = MunkHTML_ALIGN_TOP;
+        } else if (valign == wxT("BOTTOM")) {
+		m_CellInfo[r][c].valign = MunkHTML_ALIGN_BOTTOM;
+        } else if (valign == wxT("CENTER")) {
+		m_CellInfo[r][c].valign = MunkHTML_ALIGN_CENTER;
+	} else {
+		m_CellInfo[r][c].valign = MunkHTML_ALIGN_BOTTOM;
+	}
     }
 
     // nowrap
@@ -6400,6 +7100,7 @@ void MunkHtmlTableCell::Layout(int w)
         }
         m_Height = ypos[m_NumRows];
         delete[] ypos;
+
     }
 
     /* 4. adjust table's width if it was too small: */
@@ -6410,6 +7111,7 @@ void MunkHtmlTableCell::Layout(int w)
         if (twidth > m_Width)
             m_Width = twidth;
     }
+
 }
 
 
@@ -6554,6 +7256,7 @@ MunkQDHTMLHandler::MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMag
 	startMunkHTMLFontAttributeStack();
 	m_smallcaps_stack.push(false);
 	SetCharWidthHeight();
+	m_current_white_space_kind = kWSKNormal;
 
 	OpenContainer();
 
@@ -6654,15 +7357,51 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			throw MunkQDException(std::string("Anchor start-tag <a ....> without either href or name! Please add either href or name"));
 
 		}
-	} else if (tag == "p") {
-		if (GetContainer()->GetFirstChild() != NULL){
-				CloseContainer();
-				OpenContainer();
+	} else if (tag == "p" || tag == "pre"
+		   || tag == "h1" || tag == "h2" || tag == "h3") {
+		//if (GetContainer()->GetFirstChild() != NULL){
+			CloseContainer();
+			OpenContainer();
+			//}
+		if (tag == "h1") {
+			startH1();
+		} else if (tag == "h2") {
+			startH2();
+		} else if (tag == "h3") {
+			startH3();
+		}
+
+	
+		if (tag == "h1" || tag == "h2" || tag == "h3") {
+			GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
+		}
+
+		if (tag == "pre") {
+			m_current_white_space_kind = kWSKPre;
 		}
 		wxString css_style;
 
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 		GetContainer()->SetAlign(munkTag);
+		GetContainer()->SetVAlign(munkTag);
+		GetContainer()->SetWidthFloat(munkTag);
+		GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
+		GetContainer()->SetDirection(munkTag);
+
+
+		// NONSTANDARD
+		// Support COLOR attribute
+		wxColour newColor = GetActualColor();
+		if (munkTag.HasParam(wxT("COLOR"))){
+			wxColour clr;
+			if (munkTag.GetParamAsColour(wxT("COLOR"), &clr)) {
+				if (clr.Ok()) {
+					newColor = clr;
+					css_style += wxT("color : ") + munkTag.GetParam(wxT("COLOR")) + wxT(';');
+				}
+			}
+		}
+
 
 		// Support BGCOLOR tag on <p> element.
 		// This is non-standard, but useful.
@@ -6676,96 +7415,25 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			}
 		}
 
-		// NONSTANDARD		
-		if (munkTag.HasParam(wxT("MARGIN_LEFT"))) {
-			double marginLeft;
-			if (!munkTag.GetParamAsLengthInInches(wxT("MARGIN_LEFT"), &marginLeft)) {
-				marginLeft = 0.0;
-			}
-			// Convert to pixels, based on 72 dpi
-			// FIXME: What about printing?
-			marginLeft = (marginLeft*72.0);
+		// Set margins and TextIndent and padding
+		// NONSTANDARD
+		GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
 
-			GetContainer()->SetIndent((int) marginLeft, MunkHTML_INDENT_LEFT, MunkHTML_UNITS_PIXELS);
-			css_style += wxString::Format(wxT("margin-left : %fpx;"), marginLeft);
-		} else {
-			GetContainer()->SetIndent(0, MunkHTML_INDENT_LEFT, MunkHTML_UNITS_PIXELS);
+		if (tag == "p") {
+			this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
 		}
 
-		// NONSTANDARD		
-		if (munkTag.HasParam(wxT("MARGIN_RIGHT"))) {
-			double marginRight;
-			if (!munkTag.GetParamAsLengthInInches(wxT("MARGIN_RIGHT"), &marginRight)) {
-				marginRight = 0.0;
-			}
-			// Convert to pixels, based on 72 dpi
-			// FIXME: What about printing?
-			marginRight = (marginRight*72.0);
-
-			GetContainer()->SetIndent((int) marginRight, MunkHTML_INDENT_RIGHT, MunkHTML_UNITS_PIXELS);
-			css_style += wxString::Format(wxT("margin-right : %fpx;"), marginRight);
-		} else {
-			GetContainer()->SetIndent(0, MunkHTML_INDENT_RIGHT, MunkHTML_UNITS_PIXELS);
-		}
-
-
-
-		// NONSTANDARD		
-		if (munkTag.HasParam(wxT("TEXT_INDENT"))) {
-			double firstLineIndent;
-			if (!munkTag.GetParamAsLengthInInches(wxT("TEXT_INDENT"), &firstLineIndent)) {
-				firstLineIndent = 0.0;
-			}
-			// Convert to pixels, based on 72 dpi
-			// FIXME: What about printing?
-			firstLineIndent = (firstLineIndent*72);
-
-			GetContainer()->SetFirstLineIndent(firstLineIndent);
-			css_style += wxString::Format(wxT("text-indent : %fpx;"), firstLineIndent);
-		} else {
-			GetContainer()->SetFirstLineIndent(0);
-		}
-
-		// NONSTANDARD		
-		if (munkTag.HasParam(wxT("MARGIN_TOP"))) {
-			double marginTop;
-			if (!munkTag.GetParamAsLengthInInches(wxT("MARGIN_TOP"), &marginTop)) {
-				marginTop = 0.0;
-			}
-			// Convert to pixels, based on 72 dpi
-			// FIXME: What about printing?
-			marginTop = (marginTop*72.0);
-
-			GetContainer()->SetIndent((int) marginTop, MunkHTML_INDENT_TOP, MunkHTML_UNITS_PIXELS);
-			css_style += wxString::Format(wxT("margin-top : %fpx;"), marginTop);
-		} else {
-			GetContainer()->SetIndent(GetCharHeight(), MunkHTML_INDENT_TOP, MunkHTML_UNITS_PIXELS);
-		}
-
-
-		// NONSTANDARD		
-		if (munkTag.HasParam(wxT("MARGIN_BOTTOM"))) {
-			double marginBottom;
-			if (!munkTag.GetParamAsLengthInInches(wxT("MARGIN_BOTTOM"), &marginBottom)) {
-				marginBottom = 0.0;
-			}
-			// Convert to pixels, based on 72 dpi
-			// FIXME: What about printing?
-			marginBottom = (marginBottom*72.0);
-
-			GetContainer()->SetIndent((int) marginBottom, MunkHTML_INDENT_BOTTOM, MunkHTML_UNITS_PIXELS);
-			css_style += wxString::Format(wxT("margin-bottom : %fpx;"), marginBottom);
-		} else {
-			GetContainer()->SetIndent(0, MunkHTML_INDENT_BOTTOM, MunkHTML_UNITS_PIXELS);
-		}
-
-		MunkMiniDOMTag *pMiniDOMTag = new MunkMiniDOMTag("p", kStartTag);
+		MunkMiniDOMTag *pMiniDOMTag = new MunkMiniDOMTag(tag, kStartTag);
 		if (!css_style.IsEmpty()) {
 			pMiniDOMTag->setAttr("style", std::string((const char*)css_style.ToUTF8()));
 		}
 
 		AddHtmlTagCell(pMiniDOMTag);
-		
+
+		startColor(newColor);
+		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
+
+		SetAlign(GetContainer()->GetAlignHor());
 	} else if (tag == "br") {
 		GetContainer()->InsertCell(new MunkHtmlLineBreakCell(m_pDC, GetContainer()->GetFirstChild()));
 	} else if (tag == "form") {
@@ -6953,8 +7621,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		MunkHtmlForm *pForm = m_pCanvas->m_pForms->getForm(m_cur_form_id);
 		if (pForm != 0) {
-		  pForm->addFormElement(name, kFESelect, width, -1);
-
+			pForm->addFormElement(name, kFESelect, width, -1);
+			
 			MunkHtmlFormElement *pComboBox = pForm->getFormElement(name);
 			pComboBox->setSubmitOnSelect(bSubmitOnSelect);
 		}
@@ -6995,7 +7663,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		MunkHtmlForm *pForm = m_pCanvas->m_pForms->getForm(m_cur_form_id);
 		if (pForm != 0) {
-		  pForm->addFormElement(name, kFERadioBox, size, -1);
+			pForm->addFormElement(name, kFERadioBox, size, -1);
 			
 			MunkHtmlFormElement *pRadioBox = pForm->getFormElement(name);
 			pRadioBox->setDisabled(bDisabled);
@@ -7004,21 +7672,23 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		CloseContainer();
 		OpenContainer();
 
+
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 
-		// NONSTANDARD          
-		int padding;
-		if (munkTag.HasParam(wxT("PADDING"))) {
-			if (!munkTag.GetParamAsInt(wxT("PADDING"), &padding)) {
-				padding = 0;
-			}
-		} else {
-			padding = 0;
-		}
-		GetContainer()->SetIndent(padding, MunkHTML_INDENT_ALL, MunkHTML_UNITS_PIXELS);
+		// NONSTANDARD: Set margins and text_indent and padding
+		wxString css_style; // Not used for div.
+		GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
 
-		OpenContainer();
-		OpenContainer();
+		GetContainer()->SetWidthFloat(munkTag);
+		GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
+		GetContainer()->SetAlign(munkTag);
+		GetContainer()->SetVAlign(munkTag);
+
+		// NONSTANDARD: background_image and background_repeat
+		this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
+
+		// OpenContainer();
+		// OpenContainer();
 	} else if (tag == "b") {
 		startBold();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
@@ -7077,6 +7747,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		startSubscript(oldbase + c ? c->GetScriptBaseline() : 0);
 
 		cont->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
+		/*
 	} else if (tag == "h1" || tag == "h2" || tag == "h3") {
 		if (tag == "h1") {
 			startH1();
@@ -7090,7 +7761,6 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		if (c->GetFirstChild())	{
 			CloseContainer();
 			OpenContainer();
-			c = GetContainer();
 		}
 		c = GetContainer();
 
@@ -7100,6 +7770,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		c->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
 		c->SetIndent(GetCharHeight(), MunkHTML_INDENT_TOP);
 		SetAlign(c->GetAlignHor());
+		*/
 	} else if (tag == "img") {
 		if (attrs.find("src") != attrs.end()) {
 			int w = wxDefaultCoord, h = wxDefaultCoord;
@@ -7246,7 +7917,9 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		c->SetIndent(0, MunkHTML_INDENT_VERTICAL);
 		c->SetAlignHor(MunkHTML_ALIGN_CENTER);
 		c->SetAlign(munkTag);
+		c->SetVAlign(munkTag);
 		c->SetWidthFloat(munkTag);
+		c->SetHeight(munkTag, 1.0); // FIXME: What about printing?
 		sz = 2;
 		munkTag.GetParamAsInt(wxT("SIZE"), &sz);
 		HasShading = !(munkTag.HasParam(wxT("NOSHADE")));
@@ -7268,10 +7941,12 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 		c->SetAlign(munkTag);
+		c->SetVAlign(munkTag);
 		c->SetMinHeight(GetCharHeight());
 	} else if (tag == "table" || tag == "tr" || tag == "td" || tag == "th") {
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 		MunkHtmlContainerCell *c;
+		wxString css_style; // Not used for these tags
 		if (tag == "table") {
 			int oldAlign = GetAlign();
 
@@ -7314,11 +7989,22 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 					pTable->SetWidthFloat(0, MunkHTML_UNITS_PIXELS);
 				}
 			}
+			//pTable->SetWidthFloat(munkTag, 1.0); // FIXME: What about printing?
+			pTable->SetDirection(munkTag);
+
 			if (munkTag.HasParam(wxT("ALIGN"))) {
 				m_tAlignStack.push(munkTag.GetParam(wxT("ALIGN")));
 			} else {
 				m_tAlignStack.push(wxEmptyString);
 			}
+
+			// NONSTANDARD: Set margins and text_indent and padding
+			GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
+
+			// NONSTANDARD: Set width
+			GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
+
+
 		} else if (!m_tables_stack.empty()) {
 			// new row in table
 			if (munkTag.GetName() == wxT("TR")) {
@@ -7349,8 +8035,27 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 					SetAlign(MunkHTML_ALIGN_LEFT);
 				else if (als == wxT("CENTER"))
 					SetAlign(MunkHTML_ALIGN_CENTER);
-				
+
 				OpenContainer();
+
+				// NONSTANDARD: Set margins and text_indent and padding
+				GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
+
+				if (tag == "td" || tag == "th") {
+					// NONSTANDARD: background_image and background_repeat
+					this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
+
+					// NONSTANDARD: Borders
+					this->SetBorders(tag, attrs, munkTag, css_style, GetContainer());
+					// NONSTANDARD: Set height
+					GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
+
+					// NONSTANDARD: Set width
+					GetContainer()->SetWidthFloat(munkTag, 1.0); // FIXME: What about printing?
+
+					// NONSTANDARD: direction (rtl|ltr)
+					GetContainer()->SetDirection(munkTag);
+				}
 			}
 		}
 	} else if (tag == "dl") {
@@ -7384,6 +8089,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 			MunkHtmlContainerCell *mark = c;
 			c->SetWidthFloat(1 * GetCharWidth(), MunkHTML_UNITS_PIXELS);
+			c->SetDirection(munkTag);
+
 			if (m_Numbering == 0) {
 				// Centering gives more space after the bullet
 				c->SetAlignHor(MunkHTML_ALIGN_CENTER);
@@ -7565,7 +8272,9 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 							m_pCanvas->GetParentMunkHtmlWindow()->SetHTMLBackgroundImage(wxBitmap(image, -1), background_repeat);
 						}
 					} else {
-						// std::cerr << "UP257: image was not OK!" << std::endl;
+#ifdef __LINUX__
+						std::cerr << "UP257: image was not OK!" << std::endl;
+#endif
 					}
 				}
 				delete str;
@@ -7613,8 +8322,27 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetContainer()->GetBackgroundColour(), MunkHTML_CLR_BACKGROUND));
-	} else if (tag == "p") {
-		AddHtmlTagCell(new MunkMiniDOMTag("p", kEndTag));
+	} else if (tag == "p" || tag == "pre"
+		   || tag == "h1" || tag == "h2" || tag == "h3") {
+		endTag(); // ends startColor() from the start tag
+		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
+
+		if (tag == "h1"
+		   || tag == "h2"
+		   || tag == "h3") {
+			endTag();
+			GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
+			/*
+			CloseContainer();
+			OpenContainer();
+			*/
+		}
+		AddHtmlTagCell(new MunkMiniDOMTag(tag, kEndTag));
+
+		if (tag == "pre") {
+			m_current_white_space_kind = kWSKNormal;
+		}
+
 	} else if (tag == "br") {
 		; // Nothing to do
 	} else if (tag == "form") {
@@ -7642,8 +8370,8 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 	} else if (tag == "option") {
 		; // Nothing to do
 	} else if (tag == "div") {
-		CloseContainer();
-		CloseContainer();
+		// CloseContainer();
+		// CloseContainer();
 	} else if (tag == "b") {
 		endTag();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
@@ -7669,6 +8397,7 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
 	} else if (tag == "pagebreak") {
 		// Nothing to do; all was done at the start of the tag.
+		/*
 	} else if (tag == "h1"
 		   || tag == "h2"
 		   || tag == "h3") {
@@ -7678,6 +8407,7 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		OpenContainer();
 		MunkHtmlContainerCell *c = GetContainer();
 		c->SetIndent(GetCharHeight(), MunkHTML_INDENT_TOP);
+		*/
 	} else if (tag == "table") {
 		std::pair<std::pair<long,bool>, MunkHtmlContainerCell*> mypair = 
 			m_table_cell_info_stack.top();
@@ -7691,8 +8421,11 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 			CloseContainer();
 		}
 		m_tables_stack.pop();
-	} else if (tag == "td" || tag == "tr" || tag == "th") {
-		; // Nothing to do
+	} else if (tag == "td" || tag == "th") {
+		CloseContainer();
+		CloseContainer();
+	} else if (tag == "tr") {
+		//; // Nothing to do
 	} else if (tag == "hr") {
 		; // Do nothing
 	} else if (tag == "dl") {
@@ -7771,21 +8504,169 @@ void MunkQDHTMLHandler::endDocument(void) throw(MunkQDException)
 
 void MunkQDHTMLHandler::AddText(const std::string& str)
 {
-	wxString txt(str.c_str(), wxConvUTF8);
 	size_t i = 0,
 		x,
-		lng = wxStrlen(txt);
+		lng = str.length();
 	register wxChar d;
 	int templen = 0;
 	wxChar nbsp = 160;
 	
-	if (lng+1 > m_tmpStrBufSize) {
-		delete[] m_tmpStrBuf;
-		m_tmpStrBuf = new wxChar[lng+1];
-		m_tmpStrBufSize = lng+1;
-	}
-	wxChar *temp = m_tmpStrBuf;
+	eWhiteSpaceKind white_space_constant = m_current_white_space_kind;
 	
+	wxString strText = wxString(str.c_str(), wxConvUTF8);
+
+	// 1. Each tab (U+0009), carriage return (U+000D), or space
+	//    (U+0020) character surrounding a linefeed (U+000A)
+	//    character is removed if 'white-space' is set to
+	//    'normal', 'nowrap', or 'pre-line'.
+	if (white_space_constant == kWSKNormal
+	    || white_space_constant == kWSKNowrap
+	    || white_space_constant == kWSKPreLine) {
+		wxRegEx regex_space_newline_space(wxT("[\x09\x0d\x20]?\x0a[\x09\x0d\x20]?"));
+		regex_space_newline_space.ReplaceAll(&strText, wxT("\x0a"));
+	}
+
+	// 2. If 'white-space' is set to 'pre' or 'pre-wrap', any
+	//    sequence of spaces (U+0020) unbroken by an element
+	//    boundary is treated as a sequence of non-breaking
+	//    spaces. However, for 'pre-wrap', a line breaking
+	//    opportunity exists at the end of the sequence.
+	if (white_space_constant == kWSKPre
+	    || white_space_constant == kWSKPreWrap) {
+		wxRegEx regex_space(wxT("\x20"));
+		regex_space.ReplaceAll(&strText, wxT("\xa0"));
+	}
+
+	// 3. If 'white-space' is set to 'normal' or 'nowrap',
+	//    linefeed characters are transformed for rendering
+	//    purpose into one of the following characters: a space
+	//    character, a zero width space character (U+200B), or no
+	//    character (i.e., not rendered), according to UA-specific
+	//    algorithms based on the content script.
+	if (white_space_constant == kWSKNormal
+	    || white_space_constant == kWSKNowrap) {
+		// We always simply make it into a space
+		wxRegEx regex_linefeed(wxT("\x0a"));
+		regex_linefeed.ReplaceAll(&strText, wxT("\x20"));
+	}
+
+	// 4. If 'white-space' is set to 'normal', 'nowrap', or
+	//    'pre-line',
+	//
+	//    1. every tab (U+0009) is converted to a space (U+0020)
+	//
+	//    2. any space (U+0020) following another space (U+0020) —
+	//    even a space before the inline, if that space also has
+	//    'white-space' set to 'normal', 'nowrap' or 'pre-line' —
+	//    is removed.
+	if (white_space_constant == kWSKNormal
+	    || white_space_constant == kWSKNowrap
+	    || white_space_constant == kWSKPreLine) {
+		wxRegEx regex_tab(wxT("\x09"));
+		regex_tab.ReplaceAll(&strText, wxT("\x20"));
+
+		wxRegEx regex_space_spaces(wxT("\x20[\x20]+"));
+		regex_space_spaces.ReplaceAll(&strText, wxT("\x20"));
+	}
+
+	// std::cerr << "UP316: str = '" << str << "' strText = '" << std::string((const char*) strText.mb_str(wxConvUTF8)) << "'\n";
+
+	if (white_space_constant == kWSKPre
+	    || white_space_constant == kWSKPreWrap
+	    || white_space_constant == kWSKPreLine) {
+		wxString strLine;
+		int text_length = strText.Length();
+		for (int index = 0;
+		     index < text_length;
+		     ++index) {
+			wxChar c = strText[index];
+			bool bCIsNewline = c == wxT('\n');
+			bool bEndLine = (bCIsNewline || index == text_length - 1);
+			if (!bCIsNewline) {
+				strLine += c;
+			}
+
+			// FIXME: We here ignore the fact that \x09
+			// (TAB) should be treated specially!
+			if (bEndLine) {
+				if (white_space_constant == kWSKPreLine) {
+					while (strLine.Right(1) == wxT(' ')) {
+						strLine.RemoveLast();
+					}
+					while (strLine.Left(1) == wxT(' ')) {
+						strLine.Remove(0, 1);
+					}
+				}
+				DoAddText(strLine, templen);
+				if (bCIsNewline) {
+					GetContainer()->InsertCell(new MunkHtmlLineBreakCell(m_pDC, GetContainer()->GetFirstChild()));
+				}
+				strLine = wxT("");
+			}
+		}
+	} else if (white_space_constant == kWSKNormal
+		   || white_space_constant == kWSKNowrap) {
+		wxString strWhiteSpacePrefix;
+		wxString strStringToBeTokenized;
+		unsigned int index = 0;
+		unsigned int text_length = strText.Length();
+
+		// Determine if we had seen some space before
+		// (or had just opened a Container)
+		if (m_tmpLastWasSpace) {
+			// Remove whitespace at the beginning
+			while ((index < text_length) &&
+			       IsWhiteSpace(strText[index])) {
+				index++;
+			}
+
+			if (index > 0) {
+				strText = strText.Right(text_length - index);
+				index = 0;
+				text_length = strText.Length();
+			}
+		}
+		
+		bool bInWhiteSpace = false;
+		wxString strToken;
+		if (text_length > 0) {
+			bInWhiteSpace = IsWhiteSpace(strText[0]);
+		}
+		while (index < text_length)  {
+			wxChar c = strText[index];
+			if (IsWhiteSpace(c)) {
+				if (bInWhiteSpace) {
+					strToken += c;
+				} else {
+					if (!strToken.IsEmpty()) {
+						DoAddText(strToken, templen);
+						strToken = wxT("");
+					}
+					strToken += c;
+				}
+				bInWhiteSpace = true;
+			} else {
+				if (bInWhiteSpace) {
+					if (!strToken.IsEmpty()) {
+						DoAddText(strToken, templen);
+						strToken = wxT("");
+					}
+					strToken += c;
+				} else {
+					strToken += c;
+				}
+				bInWhiteSpace = false;
+			}
+
+			++index;
+		}
+		if (!strToken.IsEmpty()) {
+			DoAddText(strToken, templen);
+		}
+	}
+	
+
+	/*	
 	if (m_tmpLastWasSpace) {
 		while ((i < lng) &&
 		       ((txt[i] == wxT('\n')) || (txt[i] == wxT('\r')) || (txt[i] == wxT(' ')) ||
@@ -7809,10 +8690,26 @@ void MunkQDHTMLHandler::AddText(const std::string& str)
 		}
 	}
 
+	wxString txt(str.c_str(), wxConvUTF8);
+	size_t i = 0,
+		x,
+		lng = wxStrlen(txt);
+	register wxChar d;
+	int templen = 0;
+	wxChar nbsp = 160;
+	
+	if (lng+1 > m_tmpStrBufSize) {
+		delete[] m_tmpStrBuf;
+		m_tmpStrBuf = new wxChar[lng+1];
+		m_tmpStrBufSize = lng+1;
+	}
+	wxChar *temp = m_tmpStrBuf;
+
 	if (templen && (templen > 1 || temp[0] != wxT(' '))) {
 		DoAddText(temp, templen, nbsp);
 		m_tmpLastWasSpace = false;
 	}
+	*/
 }
 
 
@@ -7838,6 +8735,28 @@ void MunkQDHTMLHandler::DoAddText(wxChar *temp, int& templen, wxChar nbsp)
     m_pCurrentContainer->InsertCell(c);
     ((MunkHtmlWordCell*)c)->SetPreviousWord(m_lastWordCell);
     m_lastWordCell = (MunkHtmlWordCell*)c;
+}
+
+void MunkQDHTMLHandler::DoAddText(const wxString& txt, int& templen)
+{
+	templen = 0;
+	wxString mytxt = txt;
+
+	// Replace nbsp (U+00A0) with space
+	mytxt.Replace(wxString::FromUTF8("\xc2\xa0"), wxT(" "));
+	MunkHtmlCell *c = new MunkHtmlWordCell(mytxt, *(m_pDC));
+
+	if (!mytxt.IsEmpty() && mytxt.Right(1) == wxT(' ')) {
+		m_tmpLastWasSpace = true;
+	} else {
+		m_tmpLastWasSpace = false;
+	}
+	
+	ApplyStateToCell(c);
+	
+	m_pCurrentContainer->InsertCell(c);
+	((MunkHtmlWordCell*)c)->SetPreviousWord(m_lastWordCell);
+	m_lastWordCell = (MunkHtmlWordCell*)c;
 }
 
 
@@ -7959,6 +8878,255 @@ void MunkQDHTMLHandler::text(const std::string& str) throw(MunkQDException)
 {
 	m_chars += str;
 }
+
+// NONSTANDARD: background_image and background_repeat
+void MunkQDHTMLHandler::SetBackgroundImageAndBackgroundRepeat(const std::string& tag, 
+							      const MunkAttributeMap& attrs,
+							      const MunkHtmlTag& munkTag, 
+							      wxString& css_style,
+							      MunkHtmlContainerCell *pContainer)
+{
+	if (munkTag.HasParam(wxT("BACKGROUND_IMAGE"))) {
+		// NONSTANDARD          
+		int background_repeat = MunkHTML_BACKGROUND_REPEAT_REPEAT;
+		wxString css_background_repeat;
+		if (munkTag.HasParam(wxT("BACKGROUND_REPEAT"))) {
+			wxString bgrepeat = munkTag.GetParam(wxT("BACKGROUND_REPEAT"));
+			if (bgrepeat == wxT("REPEAT")) {
+				background_repeat = MunkHTML_BACKGROUND_REPEAT_REPEAT;
+				css_background_repeat = wxT("repeat");
+			} else if (bgrepeat == wxT("REPEAT-X")) {
+				background_repeat = MunkHTML_BACKGROUND_REPEAT_REPEAT_X;
+				css_background_repeat = wxT("repeat-x");
+			} else if (bgrepeat == wxT("REPEAT-Y")) {
+				background_repeat = MunkHTML_BACKGROUND_REPEAT_REPEAT_Y;
+				css_background_repeat = wxT("repeat-y");
+			} else if (bgrepeat == wxT("NO-REPEAT")) {
+				background_repeat = MunkHTML_BACKGROUND_REPEAT_NO_REPEAT;
+				css_background_repeat = wxT("no-repeat");
+			} else {
+				// The default is "repeat"
+				background_repeat = MunkHTML_BACKGROUND_REPEAT_REPEAT;
+				css_background_repeat = wxT("repeat");
+			}
+		}
+			
+		int w = wxDefaultCoord;
+		int h = wxDefaultCoord;
+
+		wxFSFile *str;
+		wxString bgimgurl = wxString(getMunkAttribute(attrs, "background_image").c_str(), wxConvUTF8);
+		wxString mn = wxEmptyString;
+		
+		str = m_pCanvas->GetFS()->OpenFile(bgimgurl, wxFS_SEEKABLE|wxFS_READ);
+		if (str) {
+			wxInputStream *s = str->GetStream();
+			if (s) {
+				wxImage image(*s, wxBITMAP_TYPE_ANY);
+				if (image.Ok()) {
+					if (m_pCanvas->GetParentMunkHtmlWindow() != NULL) {
+						pContainer->SetBackgroundImage(wxBitmap(image, -1));
+						pContainer->SetBackgroundRepeat(background_repeat);
+					}
+				} else {
+#ifdef __LINUX__
+					std::cerr << "UP257: image was not OK while getting background_image = " << (std::string((const char*) bgimgurl.ToUTF8())) << std::endl;
+#endif
+				}
+			}
+			delete str;
+			css_style += wxT(" background_image=\"") + bgimgurl + wxT("\";")
+				+ wxT(" background_repeat = ") + css_background_repeat + wxT(";");
+		} else {
+#ifdef __LINUX__
+			std::cerr << "UP259: stream was not OK while getting background_image = " << (std::string((const char*) bgimgurl.ToUTF8())) << std::endl;
+#endif
+		}
+	} 
+}
+
+bool findBorder(const std::string& attrib_to_find,
+		const MunkAttributeMap& attrs,
+		MunkHtmlBorderDirection& direction,
+		MunkHtmlBorderStyle& style,
+		int& border_width,
+		wxColour& clr1, 
+		wxColour& clr2,
+		double pixel_scale)
+{
+	border_width = 0;
+	style = MunkHTML_BORDER_STYLE_NONE;
+	clr1 = *wxBLACK;
+	clr2 = *wxBLACK;
+	if (attrs.find(attrib_to_find) != attrs.end()) {
+		std::string attrib = getMunkAttribute(attrs, attrib_to_find);
+		std::list<std::string> arr;
+		munk_split_string(attrib, " ", arr);
+		if (arr.empty()) {
+			return false;
+		}
+		bool bResult = false;
+		std::list<std::string>::const_iterator ci = arr.begin();
+		while (ci != arr.end()) {
+			std::string part = *ci;
+			int unit = MunkHTML_UNITS_NONE;
+			int nPixels = 0;
+			if (!part.empty()) {
+				if (part.size() > 2) {
+					std::string str_unit = part.substr(part.length() - 2, std::string::npos);
+					std::string number = part.substr(0, part.length() - 2);
+					if (str_unit == "px") {
+						part = number;
+						unit = MunkHTML_UNITS_PIXELS;
+					} else if (str_unit == "in") {
+						part = number;
+						wxString doubleString = wxString(number.c_str(), wxConvUTF8);
+						double inches;
+						if (doubleString.ToDouble(&inches)) {
+							nPixels = (int) (inches * pixel_scale * 72.0);
+							unit = MunkHTML_UNITS_PIXELS;
+						}
+					}
+				}
+				if (unit != MunkHTML_UNITS_NONE) {
+					border_width = nPixels;
+					bResult = true;
+				} else if (unit == MunkHTML_UNITS_NONE
+				    && munk_string_is_number(part)) {
+					border_width = munk_string2long(part);
+					if (border_width != 0
+					    && style == MunkHTML_BORDER_STYLE_NONE) {
+						style = MunkHTML_BORDER_STYLE_SOLID;
+					}
+					bResult = true;
+				} else {
+					wxString strPart = wxString(part.c_str(), wxConvUTF8);
+					wxColour clr;
+					if (part == "solid") {
+						style = MunkHTML_BORDER_STYLE_SOLID;
+					} else if (part == "outset") {
+						style = MunkHTML_BORDER_STYLE_OUTSET;
+					} else if (GetStringAsColour(strPart, &clr)) {
+						clr1 = clr;
+						clr2 = clr;
+					}
+					bResult = true;
+				}
+			}
+			++ci;
+		}
+		return bResult;
+	} else {
+		return false;
+	}
+}
+
+// NONSTANDARD: Borders
+void MunkQDHTMLHandler::SetBorders(const std::string& tag, 
+				   const MunkAttributeMap& attrs,
+				   const MunkHtmlTag& munkTag, 
+				   wxString& css_style,
+				   MunkHtmlContainerCell *pContainer)
+{
+	MunkHtmlBorderDirection direction;
+	MunkHtmlBorderStyle style;
+	int border_width;
+	wxColour clr1;
+	wxColour clr2;
+	double pixel_scale = 1.0; // FIXME: What about printing?
+	if (attrs.find("border") != attrs.end()) {
+		if (findBorder("border",
+			       attrs,
+			       direction,
+			       style,
+			       border_width,
+			       clr1,
+			       clr2,
+			       pixel_scale)) {
+			if (clr2 == clr1) {
+				clr2 = wxNullColour;
+			}
+			pContainer->SetBorder(MunkHTML_BORDER_TOP, style, border_width, clr1, clr2);
+			pContainer->SetBorder(MunkHTML_BORDER_RIGHT, style, border_width, clr1, clr2);
+			pContainer->SetBorder(MunkHTML_BORDER_BOTTOM, style, border_width, clr1, clr2);
+			pContainer->SetBorder(MunkHTML_BORDER_LEFT, style, border_width, clr1, clr2);
+		}
+	} else {
+		if (findBorder("border_top",
+			       attrs,
+			       direction,
+			       style,
+			       border_width,
+			       clr1,
+			       clr2,
+			       pixel_scale)) {
+			if (clr2 == clr1) {
+				clr2 = wxNullColour;
+			}
+			pContainer->SetBorder(MunkHTML_BORDER_TOP, style, border_width, clr1, clr2);
+		}
+		
+		if (findBorder("border_top",
+			       attrs,
+			       direction,
+			       style,
+			       border_width,
+			       clr1,
+			       clr2,
+			       pixel_scale)) {
+			if (clr2 == clr1) {
+				clr2 = wxNullColour;
+			}
+			pContainer->SetBorder(MunkHTML_BORDER_TOP, style, border_width, clr1, clr2);
+		}
+		
+		if (findBorder("border_right",
+			       attrs,
+			       direction,
+			       style,
+			       border_width,
+			       clr1,
+			       clr2,
+			       pixel_scale)) {
+			if (clr2 == clr1) {
+				clr2 = wxNullColour;
+			}
+			pContainer->SetBorder(MunkHTML_BORDER_RIGHT, style, border_width, clr1, clr2);
+		}
+		
+		if (findBorder("border_bottom",
+			       attrs,
+			       direction,
+			       style,
+			       border_width,
+			       clr1,
+			       clr2,
+			       pixel_scale)) {
+			if (clr2 == clr1) {
+				clr2 = wxNullColour;
+			}
+			pContainer->SetBorder(MunkHTML_BORDER_BOTTOM, style, border_width, clr1, clr2);
+		}
+		
+		if (findBorder("border_left",
+			       attrs,
+			       direction,
+			       style,
+			       border_width,
+			       clr1,
+			       clr2,
+			       pixel_scale)) {
+			if (clr2 == clr1) {
+				clr2 = wxNullColour;
+			}
+			pContainer->SetBorder(MunkHTML_BORDER_LEFT, style, border_width, clr1, clr2);
+		}
+		
+
+	}
+}
+
+
 
 
 MunkHtmlContainerCell *MunkQDHTMLHandler::OpenContainer()
@@ -8118,6 +9286,16 @@ void MunkQDHTMLHandler::startMunkHTMLFontAttributeStack(void)
 }
 
 
+MunkHTMLFontAttributes MunkQDHTMLHandler::startColor(const wxColour& clr)
+{
+	MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
+	current_font_attributes.m_color = clr;
+
+	m_HTML_font_attribute_stack.push(current_font_attributes);
+	return current_font_attributes;
+}
+
+
 MunkHTMLFontAttributes MunkQDHTMLHandler::startBold(void)
 {
 	MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
@@ -8196,7 +9374,7 @@ MunkHTMLFontAttributes MunkQDHTMLHandler::startH1(void)
 {
 	MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
 	current_font_attributes.m_bBold = true;
-	current_font_attributes.m_sizeFactor = 130;
+	current_font_attributes.m_sizeFactor = 150;
 
 	m_HTML_font_attribute_stack.push(current_font_attributes);
 	return current_font_attributes;
@@ -8451,7 +9629,7 @@ void MunkHtmlForm::addFormElement(const std::string& name, eMunkHtmlFormElementK
 	if (m_form_elements.find(name) != m_form_elements.end()) {
 		return; // Silently do not add if already there
 	} else {
-	  MunkHtmlFormElement *pFormElement = new MunkHtmlFormElement(m_form_id, kind, size, maxlength);
+		MunkHtmlFormElement *pFormElement = new MunkHtmlFormElement(m_form_id, kind, size, maxlength, name);
 		m_form_elements.insert(std::make_pair(name, pFormElement));
 	}
 }
@@ -8509,7 +9687,7 @@ std::list<MunkHtmlFormElement*> MunkHtmlForm::getFormElementList()
 
 int MunkHtmlFormElement::m_next_id = 20000;
 
-MunkHtmlFormElement::MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind, int xSize, int xMaxLength)
+MunkHtmlFormElement::MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind, int xSize, int xMaxLength, const std::string& name)
 {
 	m_form_id = form_id;
 	m_kind = kind;
@@ -8520,6 +9698,8 @@ MunkHtmlFormElement::MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElement
 	m_bDisabled = false;
 	m_xSize = xSize;
 	m_xMaxLength = xMaxLength;
+	m_bSubmitOnSelect = false;
+	m_name = name;
 }
 
 
@@ -8562,9 +9742,9 @@ std::string MunkHtmlFormElement::getValue()
 
 		return value;
 	} else if (m_kind == kFEText) {
-	  wxString strValue = m_pTextInputPanel->GetValue();
-	  std::string str_value = std::string((const char*) strValue.ToUTF8());
-	  return str_value;
+		wxString strValue = m_pTextInputPanel->GetValue();
+		std::string str_value = std::string((const char*) strValue.ToUTF8());
+		return str_value;
 	} else if (m_kind == kFEHidden) {
 		std::string str_value;
 		if (m_value_label_pair_list.empty()) {
@@ -8604,7 +9784,7 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 		}
 		wxString strLabel(str_label.c_str(), wxConvUTF8);
 
-		MunkHtmlButtonPanel *pButtonPanel = new MunkHtmlButtonPanel(pParent, MunkHtmlFormElement::GetNextID(), strLabel, m_form_id, wxSize(m_xSize, -1));
+		MunkHtmlButtonPanel *pButtonPanel = new MunkHtmlButtonPanel(pParent, MunkHtmlFormElement::GetNextID(), strLabel, m_form_id, wxSize(m_xSize, -1), m_name);
 
 		// pButtonPanel->Show(true);
 
@@ -8635,7 +9815,8 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 						  wxSize(m_xSize, -1),
 						  arrLabels,
 						  0,
-						  wxRA_SPECIFY_ROWS);
+						  wxRA_SPECIFY_ROWS, 
+						  m_name);
 
 		//m_pRadioBoxPanel->Show(true);
 
@@ -8665,7 +9846,8 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 						  arrLabels,
 						  wxCB_READONLY,
 						  m_form_id,
-						  false); // bSubmitOnSelect
+						  m_bSubmitOnSelect,
+						  m_name);
 
 		// m_pComboBoxPanel->Show(true);
 
@@ -8698,9 +9880,3 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 	}
 }
 
-void MunkHtmlFormElement::setSubmitOnSelect(bool bSubmitOnSelect)
-{
-	if (m_pComboBoxPanel != 0) {
-		m_pComboBoxPanel->setSubmitOnSelect(bSubmitOnSelect);
-	}
-}

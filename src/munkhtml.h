@@ -266,8 +266,10 @@ class MunkQDParser {
 //                  Used to specify units
 //--------------------------------------------------------------------------------
 
+#define MunkHTML_UNITS_NONE            0x0000
 #define MunkHTML_UNITS_PIXELS          0x0001
 #define MunkHTML_UNITS_PERCENT         0x0002
+#define MunkHTML_UNITS_INCHES          0x0004
 
 
 
@@ -373,6 +375,8 @@ public:
     bool GetParamAsColour(const wxString& par, wxColour *clr) const;
     bool GetParamAsInt(const wxString& par, int *clr) const;
     bool GetParamAsLengthInInches(const wxString& par, double *inches) const;
+    bool GetParamAsLength(const wxString& par, int *pixels, double inches_to_pixels_factor) const;
+
 
     // Scans param like scanf() functions family does.
     // Example : ScanParam("COLOR", "\"#%X\"", &clr);
@@ -792,6 +796,13 @@ protected:
     // unique identifier of the cell, generated from "id" property of tags
     wxString m_id;
 
+    // background image, may be invalid
+    wxBitmap m_bmpBg;
+
+    // background image repeat (see enum with
+    // MunkHTML_BACKGROUND_REPEAT_... enum constants)
+    int m_nBackgroundRepeat;
+
     DECLARE_ABSTRACT_CLASS(MunkHtmlCell)
     DECLARE_NO_COPY_CLASS(MunkHtmlCell)
 };
@@ -919,6 +930,24 @@ public:
 };
 
 
+enum MunkHtmlDirection
+{
+    MunkHTML_LTR,     // Left to right (the default)
+    MunkHTML_RTL      // Right to left
+};
+
+enum MunkHtmlBorderDirection {
+	MunkHTML_BORDER_TOP,
+	MunkHTML_BORDER_RIGHT,
+	MunkHTML_BORDER_BOTTOM,
+	MunkHTML_BORDER_LEFT
+};
+
+enum MunkHtmlBorderStyle {
+	MunkHTML_BORDER_STYLE_NONE,
+	MunkHTML_BORDER_STYLE_SOLID,
+	MunkHTML_BORDER_STYLE_OUTSET
+};
 
 
 
@@ -948,6 +977,10 @@ public:
     int GetAlignVer() const {return m_AlignVer;}
 
     void SetFirstLineIndent(int i) { m_IndentFirstLine = i; };
+    void SetDeclaredHeight(int h) { m_DeclaredHeight = h; };
+    void SetHeight(int h) { m_Height = h; };
+
+    int GetDeclaredHeight() const { return m_DeclaredHeight; };
 
     // sets left-border indentation. units is one of MunkHTML_UNITS_* constants
     // what is combination of MunkHTML_INDENT_*
@@ -968,21 +1001,38 @@ public:
 
     // sets alignment info based on given tag's params
     void SetAlign(const MunkHtmlTag& tag);
+    void SetVAlign(const MunkHtmlTag& tag);
+
     // sets floating width adjustment
     // (examples : 32 percent of parent container,
     // -15 pixels percent (this means 100 % - 15 pixels)
     void SetWidthFloat(int w, int units) {m_WidthFloat = w; m_WidthFloatUnits = units; m_LastLayout = -1;}
     void SetWidthFloat(const MunkHtmlTag& tag, double pixel_scale = 1.0);
+    // Tage HEIGHT atttribute and set m_DeclaredHeight.
+    void SetHeight(const MunkHtmlTag& tag, double pixel_scale = 1.0);
+    void SetBorder(const wxColour& clr1, const wxColour& clr2);
+    void SetBorder(MunkHtmlBorderDirection direction, MunkHtmlBorderStyle style, int border_width, const wxColour& set_clr1, const wxColour& set_clr2 = wxNullColour);
+
     // sets minimal height of this container.
-    void SetMinHeight(int h, int align = MunkHTML_ALIGN_TOP) {m_MinHeight = h; m_MinHeightAlign = align; m_LastLayout = -1;}
+    void SetMinHeight(int h, int align = MunkHTML_ALIGN_TOP) {m_MinHeight = h; m_MinHeightAlign = align; m_LastLayout = -1; }
+
+    // Gets minimal height of this container
+    int GetMinHeight() const { return m_MinHeight; };
+
 
     void SetBackgroundColour(const wxColour& clr);
+    void SetBackgroundImage(const wxBitmap& bmpBg) { m_bmpBg = bmpBg; }
+    void SetBackgroundRepeat(int background_repeat) { m_nBackgroundRepeat = background_repeat; };
+
     // returns background colour (of wxNullColour if none set), so that widgets can
     // adapt to it:
     wxColour GetBackgroundColour();
-    void SetBorder(const wxColour& clr1, const wxColour& clr2) {m_UseBorder = true; m_BorderColour1 = clr1, m_BorderColour2 = clr2;}
     virtual MunkHtmlLinkInfo* GetLink(int x = 0, int y = 0) const;
     virtual const MunkHtmlCell* Find(int condition, const void* param) const;
+
+    void SetDirection(const MunkHtmlTag& tag);
+    void SetMarginsAndPaddingAndTextIndent(const std::string& tag, const MunkHtmlTag& munkTag, wxString& css_style, int CurrentCharHeight);
+
 
 #if WXWIN_COMPATIBILITY_2_6
     // this was replaced by ProcessMouseClick, don't use in new code!
@@ -1028,9 +1078,19 @@ protected:
 
 protected:
     int m_IndentLeft, m_IndentRight, m_IndentTop, m_IndentBottom;
-            // indentation of subcells. There is always m_Indent pixels
-            // big space between given border of the container and the subcells
-            // it m_Indent < 0 it is in PERCENTS, otherwise it is in pixels
+
+    // Borders
+    bool m_bUseBorder;
+    int m_BorderWidthTop, m_BorderWidthRight, m_BorderWidthBottom, m_BorderWidthLeft;
+    wxColour m_BorderColour1Top, m_BorderColour2Top;
+    wxColour m_BorderColour1Right, m_BorderColour2Right;
+    wxColour m_BorderColour1Bottom, m_BorderColour2Bottom;
+    wxColour m_BorderColour1Left, m_BorderColour2Left;
+
+    MunkHtmlBorderStyle m_BorderStyleTop, m_BorderStyleRight, m_BorderStyleBottom, m_BorderStyleLeft;
+    // indentation of subcells. There is always m_Indent pixels
+    // big space between given border of the container and the subcells
+    // it m_Indent < 0 it is in PERCENTS, otherwise it is in pixels
 
     // Indentation of first line.  There is always m_IndentFirstLine
     // pixels between the m_IndentLeft position and the start of the
@@ -1050,14 +1110,19 @@ protected:
     bool m_UseBkColour;
     wxColour m_BkColour;
             // background color of this container
-    bool m_UseBorder;
-    wxColour m_BorderColour1, m_BorderColour2;
             // borders color of this container
     int m_LastLayout;
             // if != -1 then call to Layout may be no-op
             // if previous call to Layout has same argument
     int m_MaxTotalWidth;
             // Maximum possible length if ignoring line wrap
+    MunkHtmlDirection m_direction;
+
+    // width and height which are declared with CSS-like
+    // attributes
+    int m_DeclaredHeight;
+
+    wxBitmap *m_pBgImg; // Background image
 
     DECLARE_ABSTRACT_CLASS(MunkHtmlContainerCell)
     DECLARE_NO_COPY_CLASS(MunkHtmlContainerCell)
@@ -1516,12 +1581,14 @@ class MunkHtmlButtonPanel : public wxPanel {
 	wxString m_strLabel;
 	MunkHtmlWindow *m_pParent;
 	wxButton *m_pButton;
+	std::string m_name;
 public:
 	MunkHtmlButtonPanel(MunkHtmlWindow *pParent,
 			    int id,
 			    const wxString& strLabel,
 			    form_id_t form_id,
-			    wxSize size);
+			    wxSize size,
+			    const std::string& name);
 	virtual ~MunkHtmlButtonPanel();
 	void OnButtonClicked(wxCommandEvent& event);
 };
@@ -1529,7 +1596,7 @@ public:
 class MunkHtmlTextInputPanel : public wxPanel {
 	DECLARE_EVENT_TABLE()
  public:
-	MunkHtmlTextInputPanel(bool bEnable, int size_in_chars, int maxlength, form_id_t form_id, const wxString& value, MunkHtmlWindow *pParent, wxWindowID id, const wxPoint& point , const wxSize& size, long style = 0, bool bSubmitOnEnter = false);
+	MunkHtmlTextInputPanel(bool bEnable, int size_in_chars, int maxlength, form_id_t form_id, const wxString& value, MunkHtmlWindow *pParent, wxWindowID id, const wxPoint& point , const wxSize& size, long style = 0, bool bSubmitOnEnter = false, const std::string& name = "text_input");
 	virtual ~MunkHtmlTextInputPanel();
 
 	void OnEnter(wxCommandEvent& event);
@@ -1542,16 +1609,18 @@ class MunkHtmlTextInputPanel : public wxPanel {
 	MunkHtmlWindow *m_pParent;
 	bool m_bSubmitOnEnter;
 	form_id_t m_form_id;
+	std::string m_name;
 };
 
 class MunkHtmlRadioBoxPanel : public wxPanel {
  public:
-	MunkHtmlRadioBoxPanel(bool bEnable, int selection, wxWindow* parent, wxWindowID id, const wxString& label, const wxPoint& point , const wxSize& size, const wxArrayString& choices, int majorDimension = 0, long style = wxRA_SPECIFY_ROWS);
+	MunkHtmlRadioBoxPanel(bool bEnable, int selection, wxWindow* parent, wxWindowID id, const wxString& label, const wxPoint& point , const wxSize& size, const wxArrayString& choices, int majorDimension = 0, long style = wxRA_SPECIFY_ROWS, const std::string& name = "");
 	virtual ~MunkHtmlRadioBoxPanel();
 
 	int GetSelection(void) { return m_pRadioBox->GetSelection(); };
  protected:
 	wxRadioBox *m_pRadioBox;
+	std::string m_name;
 };
 
 class MunkHtmlComboBoxPanel : public wxPanel {
@@ -1559,6 +1628,7 @@ class MunkHtmlComboBoxPanel : public wxPanel {
 	form_id_t m_form_id;
 	MunkHtmlWindow *m_pParent;
 	bool m_bSubmitOnSelect;
+	std::string m_name;
  public:
 	MunkHtmlComboBoxPanel(int selection, 
 			      MunkHtmlWindow* parent, 
@@ -1569,7 +1639,8 @@ class MunkHtmlComboBoxPanel : public wxPanel {
 			      const wxArrayString& choices, 
 			      long style,
 			      form_id_t form_id,
-			      bool bSubmitOnSelect);
+			      bool bSubmitOnSelect,
+			      const std::string& name);
 	virtual ~MunkHtmlComboBoxPanel();
 
 	void OnSelect(wxCommandEvent& event);
@@ -1597,15 +1668,17 @@ class MunkHtmlFormElement {
 	bool m_bDisabled;
 	int m_xSize;
 	int m_xMaxLength;
+	bool m_bSubmitOnSelect;
+	std::string m_name;
  public:
-	MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind, int xSize, int xMaxLength);
+	MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElementKind kind, int xSize, int xMaxLength, const std::string& name);
 	~MunkHtmlFormElement();
 	std::string getValue(); // Get selected value
 	void addValueLabelPair(const std::string& value, const std::string& label, bool bSelected = false);
 	MunkHtmlWidgetCell *realizeCell(MunkHtmlWindow *pParent);
 	void setDisabled(bool bDisabled) { m_bDisabled = bDisabled; };
 
-	void setSubmitOnSelect(bool bSubmitOnSelect);
+	void setSubmitOnSelect(bool bSubmitOnSelect) { m_bSubmitOnSelect = bSubmitOnSelect; };
 
 	static int GetNextID() { return m_next_id++; };
 	static void ResetNextID() { m_next_id = 20000; };
@@ -2257,6 +2330,16 @@ enum eAnchorType {
 	kATNAME
 };
 
+
+enum eWhiteSpaceKind {
+	kWSKNormal,
+	kWSKNowrap,
+	kWSKPreLine,
+	kWSKPre,
+	kWSKPreWrap,
+};
+
+
 class MunkQDHTMLHandler : public MunkQDDocHandler {
 	MunkHtmlParsingStructure *m_pCanvas;
 	form_id_t m_cur_form_id;
@@ -2307,6 +2390,8 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 
 	// Font stuff
         wxArrayString m_Faces;
+
+	eWhiteSpaceKind m_current_white_space_kind;
  public:
 	MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMagnification);
 	virtual ~MunkQDHTMLHandler();
@@ -2328,10 +2413,21 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 
 	void AddText(const std::string& str);
 	void DoAddText(wxChar *temp, int& templen, wxChar nbsp);
+	void DoAddText(const wxString& txt, int& templen);
+
 
 	int GetCharHeight() const {return m_CharHeight;}
 	int GetCharWidth() const {return m_CharWidth;}
 
+	void SetBackgroundImageAndBackgroundRepeat(const std::string& tag, 
+						   const MunkAttributeMap& attrs,
+						   const MunkHtmlTag& munkTag, wxString& css_style,
+						   MunkHtmlContainerCell *pContainer);
+	void SetBorders(const std::string& tag, 
+			const MunkAttributeMap& attrs,
+			const MunkHtmlTag& munkTag, 
+			wxString& css_style,
+			MunkHtmlContainerCell *pContainer);
 	int GetActualFontSizeFactor() const;
 	const wxColour& GetActualColor() const;
 	MunkHtmlLinkInfo PopLink();
@@ -2350,6 +2446,7 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 
 	// returns interface to the rendering window
 
+	MunkHTMLFontAttributes startColor(const wxColour& clr);
 	MunkHTMLFontAttributes startBold(void);
 	MunkHTMLFontAttributes startEm(void);
 	MunkHTMLFontAttributes startUnderline(void);	
