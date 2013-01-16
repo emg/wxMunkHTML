@@ -576,12 +576,14 @@ public:
 	unsigned int m_sizeFactor; // In percent
 	wxColour m_color;
 	wxString m_face;
+	std::string m_stdstring_face;
 	MunkHTMLFontAttributes(bool bBold, bool bItalic, bool bUnderline, long scriptBaseline, MunkHtmlScriptMode scriptMode, unsigned int sizeFactor = 100, const wxColour& color = *wxBLACK, const wxString& face = wxT("Arial"));
 	MunkHTMLFontAttributes();
 	MunkHTMLFontAttributes(const MunkHTMLFontAttributes& other);
 	~MunkHTMLFontAttributes();
 	std::string toString() const;
 	void setFace(const wxString& face);
+
 	wxString getFace(void) const;
 	long toLong() const;
 	static MunkHTMLFontAttributes fromString(const std::string& s);

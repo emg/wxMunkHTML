@@ -1115,9 +1115,9 @@ MunkHTMLFontAttributes::MunkHTMLFontAttributes()
 	  m_scriptBaseLine(0),
 	  m_scriptMode(MunkHTML_SCRIPT_NORMAL),
 	  m_sizeFactor(100),
-	  m_color(*wxBLACK),
-	  m_face(wxT("Arial"))
+	  m_color(*wxBLACK)
 {
+	setFace(wxT("Arial"));
 }
 
 MunkHTMLFontAttributes::MunkHTMLFontAttributes(bool bBold, bool bItalic, bool bUnderline, long scriptBaseline, MunkHtmlScriptMode scriptMode, unsigned int sizeFactor, const wxColour& color, const wxString& face)
@@ -1127,9 +1127,9 @@ MunkHTMLFontAttributes::MunkHTMLFontAttributes(bool bBold, bool bItalic, bool bU
 	  m_scriptBaseLine(scriptBaseline),
 	  m_scriptMode(scriptMode),
 	  m_sizeFactor(sizeFactor),
-	  m_color(color),
-	  m_face(face)
+	  m_color(color)
 {
+	setFace(face);
 }
 
 
@@ -1202,37 +1202,37 @@ MunkHTMLFontAttributes MunkHTMLFontAttributes::fromString(const std::string& s)
 	return attr;
 }
 
+void MunkHTMLFontAttributes::setFace(const wxString& face)
+{
+	m_face = face;
+	m_stdstring_face = (const char*) m_face.ToUTF8();
+}
+
 
 std::string MunkHTMLFontAttributes::toString() const
 {
-	std::string result;
+	std::string result = "---.";
 	if (m_bBold) {
-		result += 'B';
-	} else {
-		result += '-';
-	}
+		result[0] = 'B';
+	} 
 
 	if (m_bItalic) {
-		result += 'I';
-	} else {
-		result += '-';
-	}
+		result[1] = 'I';
+	} 
 
 	if (m_bUnderline) {
-		result += 'U';
-	} else {
-		result += '-';
-	}
+		result[2] = 'U';
+	} 
 
 	switch (m_scriptMode) {
 	case MunkHTML_SCRIPT_NORMAL:
-		result += 'N';
+		result[3] = 'N';
 		break;
 	case MunkHTML_SCRIPT_SUB:
-		result += 'B';
+		result[3] = 'B';
 		break;
 	case MunkHTML_SCRIPT_SUP:
-		result += 'P';
+		result[3] = 'P';
 		break;
 	}
 
@@ -1241,7 +1241,7 @@ std::string MunkHTMLFontAttributes::toString() const
 	result += munk_long2string(m_sizeFactor);
 	
 	result += "#";
-	result += m_face.mb_str(wxConvUTF8);
+	result += m_stdstring_face;
 
 	return result;
 }
@@ -1305,6 +1305,7 @@ void MunkHTMLFontAttributes::copy_to_self(const MunkHTMLFontAttributes& other)
 	m_sizeFactor = other.m_sizeFactor;
 	m_color = other.m_color;
 	m_face = other.m_face;
+	m_stdstring_face = other.m_stdstring_face;
 }
 
 
@@ -7944,7 +7945,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		current_font_attributes.m_sizeFactor = newSizeFactor;
 
 		if (bHasFace) {
-			current_font_attributes.m_face = strFaceName;
+			current_font_attributes.setFace(strFaceName);
 		}
 		
 		m_HTML_font_attribute_stack.push(current_font_attributes);
@@ -8282,7 +8283,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		current_font_attributes.m_sizeFactor = newSizeFactor;
 
 		if (bHasFace) {
-			current_font_attributes.m_face = strFaceName;
+			current_font_attributes.setFace(strFaceName);
 		}
 		
 		m_HTML_font_attribute_stack.push(current_font_attributes);
