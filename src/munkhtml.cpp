@@ -4542,6 +4542,7 @@ void MunkHtmlButtonPanel::OnButtonClicked(wxCommandEvent& event)
 
 
 
+#if wxUSE_RADIOBOX
 
 MunkHtmlRadioBoxPanel::MunkHtmlRadioBoxPanel(bool bEnable, int selection, wxWindow* parent, wxWindowID id, const wxString& label, const wxPoint& point , const wxSize& size, const wxArrayString& choices, int majorDimension, long style, const std::string& name)
 	: wxPanel(parent, id)
@@ -4570,6 +4571,7 @@ MunkHtmlRadioBoxPanel::MunkHtmlRadioBoxPanel(bool bEnable, int selection, wxWind
 MunkHtmlRadioBoxPanel::~MunkHtmlRadioBoxPanel()
 {
 }
+#endif
 
 BEGIN_EVENT_TABLE(MunkHtmlTextInputPanel, wxPanel)
     EVT_TEXT_ENTER(wxID_ANY, MunkHtmlTextInputPanel::OnEnter)
@@ -4623,6 +4625,7 @@ void MunkHtmlTextInputPanel::OnEnter(wxCommandEvent& event)
 }
 
 
+#if wxUSE_COMBOBOX
 
 BEGIN_EVENT_TABLE(MunkHtmlComboBoxPanel, wxPanel)
     EVT_COMBOBOX(wxID_ANY, MunkHtmlComboBoxPanel::OnSelect)
@@ -4671,6 +4674,7 @@ void MunkHtmlComboBoxPanel::OnSelect(wxCommandEvent& event)
 	}
 }
 
+#endif
 
 // ---------------------------------------------------------------------------
 // MunkHtmlWidgetCell
@@ -5695,10 +5699,12 @@ void MunkHtmlWindow::HistoryClear()
 }
 
 
+#if wxUSE_CLIPBOARD
 bool MunkHtmlWindow::CanCopy() const
 {
 	return IsSelectionEnabled() && m_selection != NULL;
 }
+#endif
 
 bool MunkHtmlWindow::IsSelectionEnabled() const
 {
@@ -6246,6 +6252,16 @@ void MunkHtmlWindow::OnInternalIdle()
     }
 }
 
+
+void MunkHtmlWindow::OnFormSubmitted(wxCommandEvent& event)
+{
+	wxString strFormName = event.GetString();
+	int form_id = event.GetInt();
+	OnFormSubmitClicked(form_id, strFormName);
+}
+
+
+
 #if wxUSE_CLIPBOARD
 void MunkHtmlWindow::StopAutoScrolling()
 {
@@ -6325,14 +6341,6 @@ void MunkHtmlWindow::OnMouseLeave(wxMouseEvent& event)
         m_timerAutoScroll->Start(50); // FIXME: make configurable
     }
 }
-
-void MunkHtmlWindow::OnFormSubmitted(wxCommandEvent& event)
-{
-	wxString strFormName = event.GetString();
-	int form_id = event.GetInt();
-	OnFormSubmitClicked(form_id, strFormName);
-}
-
 
 void MunkHtmlWindow::OnKeyUp(wxKeyEvent& event)
 {
@@ -7278,7 +7286,7 @@ void MunkFontStringMetrics::assign(const MunkFontStringMetrics& other)
 //
 //////////////////////////////////////////////////////////
 
-wxRegEx MunkQDHTMLHandler::m_regex_space_newline_space(wxT("[\x09\x0d\x20]?\x0a[\x09\x0d\x20]?"));
+wxRegEx MunkQDHTMLHandler::m_regex_space_newline_space(wxString::FromUTF8("[\x09\x0d\x20]?\x0a[\x09\x0d\x20]?"));
 wxRegEx MunkQDHTMLHandler::m_regex_space(wxT("\x20"));
 wxRegEx MunkQDHTMLHandler::m_regex_linefeed(wxT("\x0a"));
 wxRegEx MunkQDHTMLHandler::m_regex_tab(wxT("\x09"));
@@ -7628,6 +7636,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			MunkHtmlFormElement *pFormElement = pForm->getFormElement(m_cur_form_select_name);
 			pFormElement->addValueLabelPair(value, label, bSelected);
 		}
+#if wxUSE_COMBOBOX
 	} else if (tag == "select") {
 		eMunkHtmlFormElementKind fe_kind = kFESelect;
 		
@@ -7678,6 +7687,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			MunkHtmlFormElement *pComboBox = pForm->getFormElement(name);
 			pComboBox->setSubmitOnSelect(bSubmitOnSelect);
 		}
+#endif
+#if wxUSE_RADIOBOX
 	} else if (tag == "radiobox") {
 		// NONSTANDARD:
 		// <radiobox name="{myname} disabled=\"true|false\"">
@@ -7720,6 +7731,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			MunkHtmlFormElement *pRadioBox = pForm->getFormElement(name);
 			pRadioBox->setDisabled(bDisabled);
 		}
+#endif
 	} else if (tag == "div") {
 		CloseContainer();
 		OpenContainer();
@@ -9775,8 +9787,12 @@ MunkHtmlFormElement::MunkHtmlFormElement(form_id_t form_id, eMunkHtmlFormElement
 	m_kind = kind;
 	m_selected_index = 0;
 	m_pButtonPanel = 0;
+#if wxUSE_RADIOBOX
 	m_pRadioBoxPanel = 0;
+#endif
+#if wxUSE_COMBOBOX
 	m_pComboBoxPanel = 0;
+#endif
 	m_bDisabled = false;
 	m_xSize = xSize;
 	m_xMaxLength = xMaxLength;
@@ -9803,6 +9819,7 @@ std::string MunkHtmlFormElement::getValue()
 			str_value = m_value_label_pair_list.begin()->first;
 		}
 		return str_value;
+#if wxUSE_RADIOBOX && wxUSE_COMBOBOX
 	} else if (m_kind == kFERadioBox
 		   || m_kind == kFESelect) {
 		int selected_index;
@@ -9823,6 +9840,7 @@ std::string MunkHtmlFormElement::getValue()
 		}
 
 		return value;
+#endif
 	} else if (m_kind == kFEText) {
 		wxString strValue = m_pTextInputPanel->GetValue();
 		std::string str_value = std::string((const char*) strValue.ToUTF8());
@@ -9874,6 +9892,7 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 		return m_pWidgetCell;
 	} else if (m_kind == kFEHidden) {
 		return 0; // Nothing to create.
+#if wxUSE_RADIOBOX
 	} else if (m_kind == kFERadioBox) {
 		wxArrayString arrLabels;
 
@@ -9904,6 +9923,8 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 
 		m_pWidgetCell = new MunkHtmlWidgetCell(m_pRadioBoxPanel, 0);
 		return m_pWidgetCell;
+#endif
+#if wxUSE_COMBOBOX
 	} else if (m_kind == kFESelect) {
 		wxArrayString arrLabels;
 
@@ -9935,6 +9956,7 @@ MunkHtmlWidgetCell *MunkHtmlFormElement::realizeCell(MunkHtmlWindow *pParent)
 
 		m_pWidgetCell = new MunkHtmlWidgetCell(m_pComboBoxPanel, 0);
 		return m_pWidgetCell;
+#endif
 	} else if (m_kind == kFEText) {
 	  std::string str_value = m_value_label_pair_list.begin()->first;
 

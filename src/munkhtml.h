@@ -1616,6 +1616,7 @@ class MunkHtmlTextInputPanel : public wxPanel {
 	std::string m_name;
 };
 
+#if wxUSE_RADIOBOX
 class MunkHtmlRadioBoxPanel : public wxPanel {
  public:
 	MunkHtmlRadioBoxPanel(bool bEnable, int selection, wxWindow* parent, wxWindowID id, const wxString& label, const wxPoint& point , const wxSize& size, const wxArrayString& choices, int majorDimension = 0, long style = wxRA_SPECIFY_ROWS, const std::string& name = "");
@@ -1626,7 +1627,9 @@ class MunkHtmlRadioBoxPanel : public wxPanel {
 	wxRadioBox *m_pRadioBox;
 	std::string m_name;
 };
+#endif
 
+#if wxUSE_COMBOBOX
 class MunkHtmlComboBoxPanel : public wxPanel {
 	DECLARE_EVENT_TABLE()
 	form_id_t m_form_id;
@@ -1655,6 +1658,7 @@ class MunkHtmlComboBoxPanel : public wxPanel {
  protected:
 	wxComboBox *m_pComboBox;
 };
+#endif
 
 
 class MunkHtmlFormElement {
@@ -1667,8 +1671,12 @@ class MunkHtmlFormElement {
 	MunkHtmlWidgetCell *m_pWidgetCell;
 	MunkHtmlButtonPanel *m_pButtonPanel;
 	MunkHtmlTextInputPanel *m_pTextInputPanel;
+#if wxUSE_RADIOBOX
 	MunkHtmlRadioBoxPanel *m_pRadioBoxPanel;
+#endif
+#if wxUSE_COMBOBOX
 	MunkHtmlComboBoxPanel *m_pComboBoxPanel;
+#endif
 	bool m_bDisabled;
 	int m_xSize;
 	int m_xMaxLength;
