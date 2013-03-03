@@ -7286,7 +7286,7 @@ void MunkFontStringMetrics::assign(const MunkFontStringMetrics& other)
 //
 //////////////////////////////////////////////////////////
 
-wxRegEx MunkQDHTMLHandler::m_regex_space_newline_space(wxString::FromUTF8("[\x09\x0d\x20]?\x0a[\x09\x0d\x20]?"));
+wxRegEx MunkQDHTMLHandler::m_regex_space_newline_space(wxT("[\x09\x0d\x20]?\x0a[\x09\x0d\x20]?"));
 wxRegEx MunkQDHTMLHandler::m_regex_space(wxT("\x20"));
 wxRegEx MunkQDHTMLHandler::m_regex_linefeed(wxT("\x0a"));
 wxRegEx MunkQDHTMLHandler::m_regex_tab(wxT("\x09"));
@@ -9346,7 +9346,8 @@ void MunkQDHTMLHandler::startMunkHTMLFontAttributeStack(void)
 								0, // baseline
 								MunkHTML_SCRIPT_NORMAL, // scriptMode
 								100,  // sizeFactor
-								*wxBLACK)); // color
+								*wxBLACK,
+								wxT("Arial"))); // color
 }
 
 
