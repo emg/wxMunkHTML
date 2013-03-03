@@ -2332,6 +2332,7 @@ IMPLEMENT_ABSTRACT_CLASS(MunkHtmlCell, wxObject)
 
 MunkHtmlCell::MunkHtmlCell() : wxObject()
 {
+    m_bIsVisible = true;
     m_Next = NULL;
     m_Parent = NULL;
     m_Width = m_Height = m_Descent = 0;
@@ -2797,6 +2798,9 @@ void MunkHtmlWordCell::Draw(wxDC& dc, int x, int y,
                           int WXUNUSED(view_y1), int WXUNUSED(view_y2),
                           MunkHtmlRenderingInfo& info)
 {
+	if (!m_bIsVisible) 
+		return;
+
 #if 0 // useful for debugging
     dc.SetPen(*wxBLACK_PEN);
     dc.DrawRectangle(x+m_PosX,y+m_PosY,m_Width /* VZ: +1? */ ,m_Height);
@@ -3326,6 +3330,7 @@ bool MunkHtmlContainerCell::AdjustPagebreak(int *pagebreak, int render_height,
 void MunkHtmlContainerCell::Layout(int w)
 {
 	MunkHtmlCell::Layout(w);
+	MunkHtmlCell::SetVisible(true);
 	
 	if (m_LastLayout == w) {
 		return;
@@ -3345,6 +3350,15 @@ void MunkHtmlContainerCell::Layout(int w)
 		// child contrainers and resets children's position to (0,0)
 		return;
 	}
+
+	{
+		// Reset all visibility to true, assuming we have set
+		// it to false sometime before in this method.
+		for (MunkHtmlCell *cell = m_Cells; cell; cell = cell->GetNext()) {
+			cell->SetVisible(true);
+		}
+	}
+	
 	
 	MunkHtmlCell *nextCell;
 	long xpos = 0;
@@ -3435,6 +3449,19 @@ void MunkHtmlContainerCell::Layout(int w)
 	MunkHtmlCell *cell = m_Cells,
 		*line = m_Cells;
 	while (cell != NULL) {
+		if (!bIsFirstLine && lineWidth == 0) {
+			// If we aren't on the first line,
+			// and we have just switched to the next line,
+			// and the cell is a MunkHtmlWordCell,
+			// and it is a space, then
+			// set its visibility to false,
+			// and go on to the next cell.
+			if (cell->IsWordSpace()) {
+				cell->SetVisible(false);
+				cell = cell->GetNext();
+				continue;
+			}
+		}
 		switch (m_AlignVer) {
 		case MunkHTML_ALIGN_TOP :
 			ybasicpos = 0; 

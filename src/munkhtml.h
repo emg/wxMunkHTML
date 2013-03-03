@@ -777,7 +777,22 @@ public:
     virtual wxString ConvertToText(MunkHtmlSelection *WXUNUSED(sel)) const
         { return wxEmptyString; }
 
+    // Set visibility. This has to do with whether the cell is to be
+    // displayed at all or not.  If it is not to be displayed, it will
+    // have no width and no height in the display. 
+    //
+    // This has nothing to do with whether it is currently scrolled
+    // into view.  
+    //
+    // Think of it as the difference between CSS "display : none;" and
+    // "display : <somethingelse>;".
+    virtual void SetVisible(bool bIsVisible) { m_bIsVisible = bIsVisible; };
+
+    virtual bool IsWordSpace() const { return false; };
+
 protected:
+    bool m_bIsVisible;
+
     // pointer to the next cell
     MunkHtmlCell *m_Next;
     // pointer to parent cell
@@ -837,6 +852,8 @@ public:
     void SetPreviousWord(MunkHtmlWordCell *cell);
 
     virtual wxString toString() const { return m_Word; };
+
+    virtual bool IsWordSpace() const { return m_Word == wxT(" "); };
 
 protected:
     void SetSelectionPrivPos(const wxDC& dc, MunkHtmlSelection *s) const;
