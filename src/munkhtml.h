@@ -827,7 +827,7 @@ class MunkHtmlWordCell : public MunkHtmlCell
 {
 public:
     MunkHtmlWordCell(const wxString& word, const wxDC& dc);
-    MunkHtmlWordCell(long m_SpaceWidth, long m_SpaceHeight, long m_SpaceDescent);
+    MunkHtmlWordCell(long SpaceWidth, long SpaceHeight, long SpaceDescent);
     virtual void Draw(wxDC& dc, int x, int y, int view_y1, int view_y2,
               MunkHtmlRenderingInfo& info);
     virtual wxCursor GetMouseCursor(MunkHtmlWindowInterface *window) const;
@@ -2451,7 +2451,7 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 
 	void AddText(const std::string& str);
 	void DoAddText(wxChar *temp, int& templen, wxChar nbsp);
-	void DoAddText(const wxString& txt, int& templen);
+	void DoAddText(const wxString& txt);
 
 
 	int GetCharHeight() const {return m_CharHeight;}

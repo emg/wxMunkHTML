@@ -2615,12 +2615,12 @@ MunkHtmlWordCell::MunkHtmlWordCell(const wxString& word, const wxDC& dc) : MunkH
     m_allowLinebreak = true;
 }
 
-MunkHtmlWordCell::MunkHtmlWordCell(long m_SpaceWidth, long m_SpaceHeight, long m_SpaceDescent) : MunkHtmlCell()
+MunkHtmlWordCell::MunkHtmlWordCell(long SpaceWidth, long SpaceHeight, long SpaceDescent) : MunkHtmlCell()
 {
 	m_Word = wxT(" ");
-	m_Width = m_SpaceWidth;
-	m_Height = m_SpaceHeight;
-	m_Descent = m_SpaceDescent;
+	m_Width = SpaceWidth;
+	m_Height = SpaceHeight;
+	m_Descent = SpaceDescent;
 	SetCanLiveOnPagebreak(false);
 	m_allowLinebreak = true;
 }
@@ -8572,7 +8572,6 @@ void MunkQDHTMLHandler::AddText(const std::string& str)
 		x,
 		lng = str.length();
 	register wxChar d;
-	int templen = 0;
 	wxChar nbsp = 160;
 	
 	eWhiteSpaceKind white_space_constant = m_current_white_space_kind;
@@ -8656,7 +8655,7 @@ void MunkQDHTMLHandler::AddText(const std::string& str)
 						strLine.Remove(0, 1);
 					}
 				}
-				DoAddText(strLine, templen);
+				DoAddText(strLine);
 				if (bCIsNewline) {
 					GetContainer()->InsertCell(new MunkHtmlLineBreakCell(m_CurrentFontSpaceHeight, GetContainer()->GetFirstChild()));
 				}
@@ -8698,7 +8697,7 @@ void MunkQDHTMLHandler::AddText(const std::string& str)
 					strToken += c;
 				} else {
 					if (!strToken.IsEmpty()) {
-						DoAddText(strToken, templen);
+						DoAddText(strToken);
 						strToken = wxT("");
 					}
 					strToken += c;
@@ -8707,7 +8706,7 @@ void MunkQDHTMLHandler::AddText(const std::string& str)
 			} else {
 				if (bInWhiteSpace) {
 					if (!strToken.IsEmpty()) {
-						DoAddText(strToken, templen);
+						DoAddText(strToken);
 						strToken = wxT("");
 					}
 					strToken += c;
@@ -8720,7 +8719,7 @@ void MunkQDHTMLHandler::AddText(const std::string& str)
 			++index;
 		}
 		if (!strToken.IsEmpty()) {
-			DoAddText(strToken, templen);
+			DoAddText(strToken);
 		}
 	}
 	
@@ -8796,10 +8795,9 @@ void MunkQDHTMLHandler::DoAddText(wxChar *temp, int& templen, wxChar nbsp)
     m_lastWordCell = (MunkHtmlWordCell*)c;
 }
 
-void MunkQDHTMLHandler::DoAddText(const wxString& txt, int& templen)
+void MunkQDHTMLHandler::DoAddText(const wxString& txt)
 {
 	MunkHtmlCell *c = 0;
-	templen = 0;
 	wxString mytxt = txt;
 
 	// Replace nbsp (U+00A0) with space
@@ -9284,6 +9282,10 @@ void MunkQDHTMLHandler::SetCharWidthHeight()
 	m_CharHeight = nHeight;
 	
 	m_pDC->SetFont(wxNullFont);
+
+	// This is necessary, so as to re-set the DC's font 
+	// next time CreateCurrentFont is called.
+	m_CurrentFontCharacteristicString = "";
 }
 
 
