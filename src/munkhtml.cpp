@@ -2635,6 +2635,11 @@ void MunkHtmlWordCell::SetPreviousWord(MunkHtmlWordCell *cell)
     }
 }
 
+eWhiteSpaceKind MunkHtmlWordCell::GetWhiteSpaceKind() const 
+{
+	return m_Parent->GetWhiteSpaceKind(); 
+}
+
 // Splits m_Word into up to three parts according to selection, returns
 // substring before, in and after selection and the points (in relative coords)
 // where s2 and s3 start:
@@ -2986,6 +2991,7 @@ MunkHtmlContainerCell::MunkHtmlContainerCell(MunkHtmlContainerCell *parent) : Mu
 	m_BorderStyleRight = MunkHTML_BORDER_STYLE_NONE;
 	m_BorderStyleBottom = MunkHTML_BORDER_STYLE_NONE;
 	m_BorderStyleLeft = MunkHTML_BORDER_STYLE_NONE;
+	SetWhiteSpaceKind(kWSKNormal);
 }
 
 
@@ -3526,8 +3532,9 @@ void MunkHtmlContainerCell::Layout(int w)
 
 		// force new line if occurred:
 		if ((cell == NULL) ||
-		    ((lineWidth + nextWordWidth > s_width) && cell->IsLinebreakAllowed())
-		    || cell->ForceLineBreak()) {
+		    ((((lineWidth + nextWordWidth > s_width) && cell->IsLinebreakAllowed())
+		     || cell->ForceLineBreak())
+		     && (this->GetWhiteSpaceKind() != kWSKNowrap))) {
 			if (lineWidth > MaxLineWidth) {
 				MaxLineWidth = lineWidth;
 			}
@@ -7343,7 +7350,7 @@ MunkQDHTMLHandler::MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMag
 	startMunkHTMLFontAttributeStack();
 	m_smallcaps_stack.push(false);
 	SetCharWidthHeight();
-	m_current_white_space_kind = kWSKNormal;
+	m_white_space_stack.push(kWSKNormal);
 
 	OpenContainer();
 
@@ -7381,6 +7388,30 @@ void MunkQDHTMLHandler::AddHtmlTagCell(MunkMiniDOMTag *pMiniDOMTag)
 {
 	if (GetContainer() != NULL) {
 		GetContainer()->InsertCell(new MunkHtmlTagCell(pMiniDOMTag));
+	}
+}
+
+eWhiteSpaceKind MunkQDHTMLHandler::GetWhiteSpace(const MunkHtmlTag& munkTag)
+{
+	if (munkTag.HasParam(wxT("WHITE_SPACE"))) {
+		wxString wsval = munkTag.GetParam(wxT("WHITE_SPACE"));
+		eWhiteSpaceKind kind = kWSKNormal;
+		if (wsval == wxT("NORMAL")) {
+			kind = kWSKNormal;			
+		} else if (wsval == wxT("NOWRAP")) {
+			kind = kWSKNowrap;			
+		} else if (wsval == wxT("PRE-LINE")) {
+			kind = kWSKPreLine;			
+		} else if (wsval == wxT("PRE")) {
+			kind = kWSKPre;			
+		} else if (wsval == wxT("PRE-WRAP")) {
+			kind = kWSKPreWrap;
+		} else if (wsval == wxT("INHERIT")) {
+			kind = m_white_space_stack.top();
+		}
+		return kind;
+	} else {
+		return m_white_space_stack.top();
 	}
 }
 
@@ -7463,9 +7494,6 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
 		}
 
-		if (tag == "pre") {
-			m_current_white_space_kind = kWSKPre;
-		}
 		wxString css_style;
 
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
@@ -7474,6 +7502,14 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		GetContainer()->SetWidthFloat(munkTag);
 		GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
 		GetContainer()->SetDirection(munkTag);
+
+		if (tag == "pre") {
+			m_white_space_stack.push(kWSKPre);
+		} else {
+			// NONSTANDARD: white_space (normal,nowrap,pre,pre-line,pre-wrap,inherit)
+			m_white_space_stack.push(GetWhiteSpace(munkTag));
+		}
+		GetContainer()->SetWhiteSpaceKind(m_white_space_stack.top());
 
 
 		// NONSTANDARD
@@ -8095,7 +8131,9 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			// NONSTANDARD: Set width
 			GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
 
-
+			// NONSTANDARD: white_space (normal,nowrap,pre,pre-line,pre-wrap,inherit)
+			m_white_space_stack.push(GetWhiteSpace(munkTag));
+			GetContainer()->SetWhiteSpaceKind(m_white_space_stack.top());
 		} else if (!m_tables_stack.empty()) {
 			// new row in table
 			if (munkTag.GetName() == wxT("TR")) {
@@ -8146,7 +8184,12 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 					// NONSTANDARD: direction (rtl|ltr)
 					GetContainer()->SetDirection(munkTag);
+
 				}
+
+				// NONSTANDARD: white_space (normal,nowrap,pre,pre-line,pre-wrap,inherit)
+				m_white_space_stack.push(GetWhiteSpace(munkTag));
+				GetContainer()->SetWhiteSpaceKind(m_white_space_stack.top());
 			}
 		}
 	} else if (tag == "dl") {
@@ -8430,10 +8473,12 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		}
 		AddHtmlTagCell(new MunkMiniDOMTag(tag, kEndTag));
 
-		if (tag == "pre") {
-			m_current_white_space_kind = kWSKNormal;
+		if (tag == "pre") {	
+			m_white_space_stack.pop();
+		} else {
+			// We pushed it in the startElement stuff
+			m_white_space_stack.pop();
 		}
-
 	} else if (tag == "br") {
 		; // Nothing to do
 	} else if (tag == "form") {
@@ -8512,11 +8557,13 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 			CloseContainer();
 		}
 		m_tables_stack.pop();
+		m_white_space_stack.pop();
 	} else if (tag == "td" || tag == "th") {
 		CloseContainer();
 		CloseContainer();
+		m_white_space_stack.pop();
 	} else if (tag == "tr") {
-		//; // Nothing to do
+		// Nothing to do
 	} else if (tag == "hr") {
 		; // Do nothing
 	} else if (tag == "dl") {
@@ -8601,7 +8648,7 @@ void MunkQDHTMLHandler::AddText(const std::string& str)
 	register wxChar d;
 	wxChar nbsp = 160;
 	
-	eWhiteSpaceKind white_space_constant = m_current_white_space_kind;
+	eWhiteSpaceKind white_space_constant = m_white_space_stack.top();
 	
 	wxString strText = wxString(str.c_str(), wxConvUTF8);
 
@@ -9221,6 +9268,7 @@ void MunkQDHTMLHandler::SetBorders(const std::string& tag,
 MunkHtmlContainerCell *MunkQDHTMLHandler::OpenContainer()
 {
 	m_pCurrentContainer = new MunkHtmlContainerCell(m_pCurrentContainer);
+	m_pCurrentContainer->SetWhiteSpaceKind(m_white_space_stack.top());
 	m_pCurrentContainer->SetAlignHor(m_Align);
 	m_tmpLastWasSpace = true;
 	return m_pCurrentContainer;
@@ -9230,6 +9278,7 @@ MunkHtmlContainerCell *MunkQDHTMLHandler::OpenContainer()
 MunkHtmlContainerCell *MunkQDHTMLHandler::SetContainer(MunkHtmlContainerCell *pNewContainer)
 {
 	m_pCurrentContainer = pNewContainer;
+	m_pCurrentContainer->SetWhiteSpaceKind(m_white_space_stack.top());
 	m_tmpLastWasSpace = true;
 	return m_pCurrentContainer;
 }

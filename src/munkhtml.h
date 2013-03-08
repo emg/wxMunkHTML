@@ -596,6 +596,15 @@ typedef std::stack<MunkHTMLFontAttributes>  MunkFontAttributeStack;
 
 
 
+enum eWhiteSpaceKind {
+	kWSKNormal,
+	kWSKNowrap,
+	kWSKPreLine,
+	kWSKPre,
+	kWSKPreWrap,
+};
+
+
 
 // ---------------------------------------------------------------------------
 // MunkHtmlCell
@@ -731,7 +740,11 @@ public:
 
     // Can the line be broken before this cell?
     virtual bool IsLinebreakAllowed() const
-        { return !IsFormattingCell(); }
+    { return !IsFormattingCell() && (GetWhiteSpaceKind() != kWSKNowrap); }
+
+    // Override for those for which it makes sense to override,
+    // such as MunkHtmlContainerCell
+    virtual eWhiteSpaceKind GetWhiteSpaceKind() const { return kWSKNormal; };
 
     virtual wxString toString() const { return wxT(""); };
  
@@ -855,6 +868,8 @@ public:
 
     virtual bool IsWordSpace() const { return m_Word == wxT(" "); };
 
+    virtual eWhiteSpaceKind GetWhiteSpaceKind() const;
+
 protected:
     void SetSelectionPrivPos(const wxDC& dc, MunkHtmlSelection *s) const;
     void Split(const wxDC& dc,
@@ -969,7 +984,6 @@ enum MunkHtmlBorderStyle {
 	MunkHTML_BORDER_STYLE_SOLID,
 	MunkHTML_BORDER_STYLE_OUTSET
 };
-
 
 
 // Container contains other cells, thus forming tree structure of rendering
@@ -1088,6 +1102,12 @@ public:
     // Returns the maximum possible length of the container.
     // Call Layout at least once before using GetMaxTotalWidth()
     virtual int GetMaxTotalWidth() const { return m_MaxTotalWidth; }
+
+ protected:
+    eWhiteSpaceKind m_white_space_kind;
+ public:
+    virtual eWhiteSpaceKind GetWhiteSpaceKind() const { return m_white_space_kind; };
+    void SetWhiteSpaceKind(eWhiteSpaceKind kind) { m_white_space_kind = kind; };
 
     
 
@@ -2360,14 +2380,6 @@ enum eAnchorType {
 };
 
 
-enum eWhiteSpaceKind {
-	kWSKNormal,
-	kWSKNowrap,
-	kWSKPreLine,
-	kWSKPre,
-	kWSKPreWrap,
-};
-
 class MunkFontStringMetrics {
  public:
 	long m_StringWidth;
@@ -2446,7 +2458,7 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	// Font stuff
         wxArrayString m_Faces;
 
-	eWhiteSpaceKind m_current_white_space_kind;
+	std::stack<eWhiteSpaceKind> m_white_space_stack;
  public:
 	MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMagnification);
 	virtual ~MunkQDHTMLHandler();
@@ -2473,6 +2485,8 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 
 	int GetCharHeight() const {return m_CharHeight;}
 	int GetCharWidth() const {return m_CharWidth;}
+
+	eWhiteSpaceKind GetWhiteSpace(const MunkHtmlTag& munkTag);
 
 	void SetBackgroundImageAndBackgroundRepeat(const std::string& tag, 
 						   const MunkAttributeMap& attrs,
