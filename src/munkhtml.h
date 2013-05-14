@@ -1045,7 +1045,7 @@ public:
     void SetWidthFloat(const MunkHtmlTag& tag, double pixel_scale = 1.0);
     // Tage HEIGHT atttribute and set m_DeclaredHeight.
     void SetHeight(const MunkHtmlTag& tag, double pixel_scale = 1.0);
-    void SetBorder(const wxColour& clr1, const wxColour& clr2);
+    void SetAllBorders(const wxColour& clr1, const wxColour& clr2, int nBorderWidth, MunkHtmlBorderStyle style);
     void SetBorder(MunkHtmlBorderDirection direction, MunkHtmlBorderStyle style, int border_width, const wxColour& set_clr1, const wxColour& set_clr2 = wxNullColour);
 
     // sets minimal height of this container.
@@ -2257,6 +2257,7 @@ protected:
 
     // should we draw borders or not?
     bool m_HasBorders;
+    int m_nBorderWidth;
     // number of columns; rows
     int m_NumCols, m_NumRows;
     // array of column information

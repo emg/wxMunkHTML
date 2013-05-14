@@ -4135,14 +4135,19 @@ void MunkHtmlContainerCell::SetHeight(const MunkHtmlTag& tag, double pixel_scale
     }
 }
 
-void MunkHtmlContainerCell::SetBorder(const wxColour& clr1, const wxColour& clr2) 
+void MunkHtmlContainerCell::SetAllBorders(const wxColour& clr1, const wxColour& clr2, int nBorderWidth, MunkHtmlBorderStyle style) 
 {
 	m_bUseBorder = true;
-	SetBorder(MunkHTML_BORDER_TOP, MunkHTML_BORDER_STYLE_SOLID, 1, clr1);
+	SetBorder(MunkHTML_BORDER_TOP, style, nBorderWidth, clr1);
+	SetBorder(MunkHTML_BORDER_LEFT, style, nBorderWidth, clr1);
+	SetBorder(MunkHTML_BORDER_BOTTOM, style, nBorderWidth, clr1);
+	SetBorder(MunkHTML_BORDER_RIGHT, style, nBorderWidth, clr1);
+	/*
 	m_BorderColour1Top = clr1, m_BorderColour2Top = clr2;
 	m_BorderColour1Right = clr1, m_BorderColour2Right = clr2;
 	m_BorderColour1Bottom = clr1, m_BorderColour2Bottom = clr2;
 	m_BorderColour1Left = clr1, m_BorderColour2Left = clr2;
+	*/
 }
 
 
@@ -6640,8 +6645,20 @@ MunkHtmlTableCell::MunkHtmlTableCell(MunkHtmlContainerCell *parent, const MunkHt
  : MunkHtmlContainerCell(parent)
 {
     m_PixelScale = pixel_scale;
-    m_HasBorders =
-            (tag.HasParam(wxT("BORDER")) && tag.GetParam(wxT("BORDER")) != wxT("0"));
+    m_HasBorders = false;
+    m_nBorderWidth = 0;
+    if (tag.HasParam(wxT("BORDER"))) {
+	    if (tag.GetParamAsInt(wxT("BORDER"), &m_nBorderWidth)) {
+		    if (m_nBorderWidth == 0) {
+			    m_HasBorders = false;
+		    } else {
+			    m_HasBorders = true;
+		    }
+	    } else {
+		    m_HasBorders = false;
+		    m_nBorderWidth = 0;
+	    } 
+    }
     m_ColsInfo = NULL;
     m_NumCols = m_NumRows = 0;
     m_CellInfo = NULL;
@@ -6666,7 +6683,7 @@ MunkHtmlTableCell::MunkHtmlTableCell(MunkHtmlContainerCell *parent, const MunkHt
     m_Padding = (int)(m_PixelScale * (double)m_Padding);
 
     if (m_HasBorders) {
-        SetBorder(TABLE_BORDER_CLR_1, TABLE_BORDER_CLR_2);
+	    SetAllBorders(TABLE_BORDER_CLR_1, TABLE_BORDER_CLR_2, m_nBorderWidth, MunkHTML_BORDER_STYLE_OUTSET);
     }
 }
 
@@ -6849,7 +6866,7 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
             cell->SetBackgroundColour(bk);
     }
     if (m_HasBorders)
-        cell->SetBorder(TABLE_BORDER_CLR_2, TABLE_BORDER_CLR_1);
+        cell->SetAllBorders(TABLE_BORDER_CLR_2, TABLE_BORDER_CLR_1, m_nBorderWidth, MunkHTML_BORDER_STYLE_OUTSET);
 
     // vertical alignment:
     {
@@ -9170,6 +9187,7 @@ void MunkQDHTMLHandler::SetBorders(const std::string& tag,
 	wxColour clr1;
 	wxColour clr2;
 	double pixel_scale = 1.0; // FIXME: What about printing?
+	/*
 	if (attrs.find("border") != attrs.end()) {
 		if (findBorder("border",
 			       attrs,
@@ -9188,6 +9206,7 @@ void MunkQDHTMLHandler::SetBorders(const std::string& tag,
 			pContainer->SetBorder(MunkHTML_BORDER_LEFT, style, border_width, clr1, clr2);
 		}
 	} else {
+	*/
 		if (findBorder("border_top",
 			       attrs,
 			       direction,
@@ -9257,9 +9276,7 @@ void MunkQDHTMLHandler::SetBorders(const std::string& tag,
 			}
 			pContainer->SetBorder(MunkHTML_BORDER_LEFT, style, border_width, clr1, clr2);
 		}
-		
-
-	}
+		//	}
 }
 
 
