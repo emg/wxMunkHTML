@@ -8211,7 +8211,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				else if (als == wxT("CENTER"))
 					SetAlign(MunkHTML_ALIGN_CENTER);
 
-				//OpenContainer();
+				OpenContainer();
 
 				if (tag == "td" || tag == "th") {
 					// NONSTANDARD: Set height
@@ -8600,7 +8600,7 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		m_white_space_stack.pop();
 	} else if (tag == "td" || tag == "th") {
 		CloseContainer();
-		//CloseContainer();
+		CloseContainer();
 		m_white_space_stack.pop();
 	} else if (tag == "tr") {
 		// Nothing to do
