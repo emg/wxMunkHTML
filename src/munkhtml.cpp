@@ -3006,6 +3006,8 @@ MunkHtmlContainerCell::MunkHtmlContainerCell(MunkHtmlContainerCell *parent) : Mu
 }
 
 
+
+
 void MunkHtmlContainerCell::SetBackgroundColour(const wxColour& clr)
 {
 	if (clr != wxNullColour) {
@@ -7178,6 +7180,8 @@ void MunkHtmlTableCell::Layout(int w)
                 actcell->SetPos(m_ColsInfo[actcol].leftpos, ypos[actrow]);
             }
         }
+
+
         m_Height = ypos[m_NumRows];
         delete[] ypos;
 
@@ -8156,7 +8160,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			// NONSTANDARD: Set margins and text_indent and padding
 			GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
 
-			// NONSTANDARD: Set width
+			// NONSTANDARD: Set height
 			GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
 
 			// NONSTANDARD: white_space (normal,nowrap,pre,pre-line,pre-wrap,inherit)
@@ -8172,6 +8176,20 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			}  else { // new cell
 				c = SetContainer(new MunkHtmlContainerCell(m_tables_stack.top()));
 				m_tables_stack.top()->AddCell(c, munkTag);
+
+				if (tag == "td" || tag == "th") {
+					// NONSTANDARD: background_image and background_repeat
+					this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
+
+					// NONSTANDARD: Borders
+					this->SetBorders(tag, attrs, munkTag, css_style, GetContainer());
+				}
+
+
+				// NONSTANDARD: white_space (normal,nowrap,pre,pre-line,pre-wrap,inherit)
+				m_white_space_stack.push(GetWhiteSpace(munkTag));
+				GetContainer()->SetWhiteSpaceKind(m_white_space_stack.top());
+
 
 				OpenContainer();
 
@@ -8193,17 +8211,9 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				else if (als == wxT("CENTER"))
 					SetAlign(MunkHTML_ALIGN_CENTER);
 
-				OpenContainer();
-
-				// NONSTANDARD: Set margins and text_indent and padding
-				GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
+				//OpenContainer();
 
 				if (tag == "td" || tag == "th") {
-					// NONSTANDARD: background_image and background_repeat
-					this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
-
-					// NONSTANDARD: Borders
-					this->SetBorders(tag, attrs, munkTag, css_style, GetContainer());
 					// NONSTANDARD: Set height
 					GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
 
@@ -8215,9 +8225,11 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 				}
 
-				// NONSTANDARD: white_space (normal,nowrap,pre,pre-line,pre-wrap,inherit)
-				m_white_space_stack.push(GetWhiteSpace(munkTag));
-				GetContainer()->SetWhiteSpaceKind(m_white_space_stack.top());
+
+
+				// NONSTANDARD: Set margins and text_indent and padding
+				GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
+
 			}
 		}
 	} else if (tag == "dl") {
@@ -8588,7 +8600,7 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		m_white_space_stack.pop();
 	} else if (tag == "td" || tag == "th") {
 		CloseContainer();
-		CloseContainer();
+		//CloseContainer();
 		m_white_space_stack.pop();
 	} else if (tag == "tr") {
 		// Nothing to do

@@ -675,6 +675,7 @@ public:
     void SetLink(const MunkHtmlLinkInfo& link);
     void SetNext(MunkHtmlCell *cell) {m_Next = cell;}
 
+
     // 1. adjust cell's width according to the fact that maximal possible width
     //    is w.  (this has sense when working with horizontal lines, tables
     //    etc.)
@@ -750,7 +751,7 @@ public:
     virtual wxString toString() const { return wxT(""); };
  
     // Returns true for simple == terminal cells, i.e. not composite ones.
-    // This if for internal usage only and may disappear in future versions!
+    // This is for internal usage only and may disappear in future versions!
     virtual bool IsTerminalCell() const { return true; }
 
     // Find a cell inside this cell positioned at the given coordinates
@@ -1051,7 +1052,8 @@ public:
     void SetBorder(MunkHtmlBorderDirection direction, MunkHtmlBorderStyle style, int border_width, const wxColour& set_clr1, const wxColour& set_clr2 = wxNullColour);
 
     // sets minimal height of this container.
-    void SetMinHeight(int h, int align = MunkHTML_ALIGN_TOP) {m_MinHeight = h; m_MinHeightAlign = align; m_LastLayout = -1; }
+    void SetMinHeight(int h, int align = MunkHTML_ALIGN_TOP) {	m_MinHeight = h; m_MinHeightAlign = align; m_LastLayout = -1;  }
+
 
     // Gets minimal height of this container
     int GetMinHeight() const { return m_MinHeight; };
