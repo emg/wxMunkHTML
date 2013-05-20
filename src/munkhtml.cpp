@@ -1566,6 +1566,8 @@ class MunkHtmlListmarkCell : public MunkHtmlCell
         MunkHtmlListmarkCell(wxDC *dc, const wxColour& clr);
         void Draw(wxDC& dc, int x, int y, int view_y1, int view_y2,
                   MunkHtmlRenderingInfo& info);
+	virtual bool IsTerminalCell() const { return true; }
+
 
     DECLARE_NO_COPY_CLASS(MunkHtmlListmarkCell)
 };
@@ -1629,14 +1631,14 @@ void MunkHtmlListCell::Layout(int w)
     ComputeMinMaxWidths();
     m_Width = wxMax(m_Width, wxMin(w, GetMaxTotalWidth()));
 
-    int s_width = m_Width - m_IndentLeft;
+    int s_width = m_Width - m_IndentLeft - m_ListmarkWidth;
 
     int vpos = 0;
     for (int r = 0; r < m_NumRows; r++)
     {
         // do layout first time to layout contents and adjust pos
         m_RowInfo[r].mark->Layout(m_ListmarkWidth);
-        m_RowInfo[r].cont->Layout(s_width - m_ListmarkWidth);
+        m_RowInfo[r].cont->Layout(s_width);
 
         const int base_mark = ComputeMaxBase( m_RowInfo[r].mark );
         const int base_cont = ComputeMaxBase( m_RowInfo[r].cont );
@@ -1672,18 +1674,19 @@ void MunkHtmlListCell::ReallocRows(int rows)
 
 void MunkHtmlListCell::ComputeMinMaxWidths()
 {
-    if (m_NumRows == 0) return;
 
     m_MaxTotalWidth = 0;
     m_Width = 0;
+
+    if (m_NumRows == 0) return;
 
     for (int r = 0; r < m_NumRows; r++)
     {
         MunkHtmlListItemStruct& row = m_RowInfo[r];
         row.mark->Layout(1);
         row.cont->Layout(1);
-        int maxWidth = row.cont->GetMaxTotalWidth();
         int width = row.cont->GetWidth();
+        int maxWidth = row.cont->GetMaxTotalWidth();
         if (row.mark->GetWidth() > m_ListmarkWidth)
             m_ListmarkWidth = row.mark->GetWidth();
         if (maxWidth > m_MaxTotalWidth)
@@ -1705,9 +1708,12 @@ public:
     MunkHtmlListcontentCell(MunkHtmlContainerCell *p) : MunkHtmlContainerCell(p) {}
     virtual void Layout(int w) {
         // Reset top indentation, fixes <li><p>
-        SetIndent(0, MunkHTML_INDENT_TOP);
+	    SetIndent(0, MunkHTML_INDENT_TOP);
         MunkHtmlContainerCell::Layout(w);
     }
+
+    virtual bool IsTerminalCell() const { return false; }
+
 };
 
 
@@ -1756,6 +1762,8 @@ class MunkHtmlLineCell : public MunkHtmlCell
                   MunkHtmlRenderingInfo& info);
         void Layout(int w)
             { m_Width = w; MunkHtmlCell::Layout(w); }
+
+	virtual bool IsTerminalCell() const { return true; }
 
     private:
         // Should we draw 3-D shading or not
@@ -2045,6 +2053,9 @@ public:
 	
 	void SetImage(const wxImage& img);
 	void SetDescent(int descent);
+
+	virtual bool IsTerminalCell() const { return true; }
+
 
 private:
 	wxBitmap           *m_bitmap;
@@ -3422,6 +3433,7 @@ void MunkHtmlContainerCell::Layout(int w)
 	  LAYOUTING :
 	  
 	*/
+
 	
 	// adjust indentation:
 	if (m_direction == MunkHTML_RTL) {
@@ -3449,8 +3461,6 @@ void MunkHtmlContainerCell::Layout(int w)
 		lineWidth += m_IndentFirstLine;
 	}
 
-
-
 	// my own layouting:
 	MunkHtmlCell *cell = m_Cells,
 		*line = m_Cells;
@@ -3463,6 +3473,7 @@ void MunkHtmlContainerCell::Layout(int w)
 			// set its visibility to false,
 			// and go on to the next cell.
 			if (cell->IsWordSpace()) {
+				curLineWidth += cell->GetMaxTotalWidth();
 				cell->SetVisible(false);
 				cell = cell->GetNext();
 				continue;
@@ -3502,7 +3513,7 @@ void MunkHtmlContainerCell::Layout(int w)
 		lineWidth += cell->GetWidth();
 
 
-		if (!cell->IsTerminalCell()
+ 		if (!cell->IsTerminalCell()
 		    && !cell->IsInlineBlock()) {
 			// Container cell indicates new line
 			if (curLineWidth > m_MaxTotalWidth) {

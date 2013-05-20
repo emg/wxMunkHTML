@@ -626,11 +626,12 @@ public:
 
     int GetPosX() const {return m_PosX;}
     int GetPosY() const {return m_PosY;}
-    int GetWidth() const {return m_Width;}
+    int GetWidth() const { return m_Width; }
+    
 
     // Returns the maximum possible length of the cell.
     // Call Layout at least once before using GetMaxTotalWidth()
-    virtual int GetMaxTotalWidth() const { return m_Width; }
+    virtual int GetMaxTotalWidth() const { return m_Width; } 
 
     int GetHeight() const {return m_Height;}
     int GetDescent() const {return m_Descent;}
@@ -1032,6 +1033,7 @@ public:
     bool m_bIsInlineBlock;
     void SetIsInlineBlock(bool bIsInlineBlock) { m_bIsInlineBlock = bIsInlineBlock; };
     virtual bool IsInlineBlock(void) { return m_bIsInlineBlock; };
+    virtual bool IsInlineBlock(void) const { return m_bIsInlineBlock; };
 
 
     // sets alignment info based on given tag's params
@@ -1101,7 +1103,7 @@ public:
 
     // Returns the maximum possible length of the container.
     // Call Layout at least once before using GetMaxTotalWidth()
-    virtual int GetMaxTotalWidth() const { return m_MaxTotalWidth; }
+    virtual int GetMaxTotalWidth() const { return m_MaxTotalWidth; } 
 
  protected:
     eWhiteSpaceKind m_white_space_kind;
@@ -1205,6 +1207,9 @@ class MunkHtmlListCell : public MunkHtmlContainerCell
         void AddRow(MunkHtmlContainerCell *mark, MunkHtmlContainerCell *cont);
         virtual void Layout(int w);
 
+	virtual bool IsTerminalCell() const { return false; }
+
+
     DECLARE_NO_COPY_CLASS(MunkHtmlListCell)
 };
 
@@ -1219,6 +1224,9 @@ class MunkHtmlLineBreakCell : public MunkHtmlCell
         virtual ~MunkHtmlLineBreakCell();
         virtual void Layout(int w);
 	virtual bool ForceLineBreak(void) { return true; };
+
+	virtual bool IsTerminalCell() const { return true; }
+
 
     DECLARE_NO_COPY_CLASS(MunkHtmlLineBreakCell)
 };
