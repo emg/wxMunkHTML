@@ -7832,11 +7832,16 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		OpenContainer();
 
 
+		OpenContainer();
+
+
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 
 		// NONSTANDARD: Set margins and text_indent and padding
 		wxString css_style; // Not used for div.
 		GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
+
+		//OpenContainer();
 
 		GetContainer()->SetWidthFloat(munkTag);
 		GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
@@ -7845,9 +7850,6 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		// NONSTANDARD: background_image and background_repeat
 		this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
-
-		OpenContainer();
-		// OpenContainer();
 	} else if (tag == "b") {
 		startBold();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
@@ -8547,7 +8549,7 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		; // Nothing to do
 	} else if (tag == "div") {
 		CloseContainer();
-		// CloseContainer();
+		//CloseContainer();
 	} else if (tag == "b") {
 		endTag();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
