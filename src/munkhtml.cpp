@@ -7850,6 +7850,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		// NONSTANDARD: background_image and background_repeat
 		this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
+		OpenContainer();
+
 	} else if (tag == "b") {
 		startBold();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
@@ -8549,7 +8551,7 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		; // Nothing to do
 	} else if (tag == "div") {
 		CloseContainer();
-		//CloseContainer();
+		CloseContainer();
 	} else if (tag == "b") {
 		endTag();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
