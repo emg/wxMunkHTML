@@ -3819,14 +3819,23 @@ void MunkHtmlContainerCell::Draw(wxDC& dc, int x, int y, int view_y1, int view_y
 	    // Now do the bitmap.
 	    const wxSize sizeContainerCell(m_Width, m_Height);
 	    const wxSize sizeBmp(m_bmpBg.GetWidth(), m_bmpBg.GetHeight());
-	    wxRect rect = wxRect(0,
-				 0, 
-				 sizeContainerCell.GetWidth(), 
-				 sizeContainerCell.GetHeight());
+	    wxSize sizeBlit;
+	    if (m_nBackgroundRepeat == MunkHTML_BACKGROUND_REPEAT_NO_REPEAT) {
+		    sizeBlit = wxSize(wxMin(sizeBmp.GetWidth(), sizeContainerCell.GetWidth()), 
+				      wxMin(sizeBmp.GetHeight(), sizeContainerCell.GetHeight()));
+	    } else {
+		    int real_y1 = mMax(ylocal, view_y1);
+		    int real_y2 = mMin(ylocal + m_Height - 1, view_y2);
 
+		    
+	    
+		    sizeBlit = wxSize(wxMax(sizeBmp.GetWidth(), sizeContainerCell.GetWidth()), 
+				      wxMax(sizeBmp.GetHeight(), real_y2 - real_y1 + 1));
+	    }
+				  
 	    wxMemoryDC *pDCM = new wxMemoryDC();
-	    wxBitmap *pBackBitmap = new wxBitmap(sizeContainerCell.GetWidth(), 
-						 sizeContainerCell.GetHeight());
+	    wxBitmap *pBackBitmap = new wxBitmap(sizeBlit.GetWidth(),
+						 sizeBlit.GetHeight());
 	    pDCM->SelectObject(*pBackBitmap);
 
 	    // PrepareDC(dcm);
@@ -3841,7 +3850,7 @@ void MunkHtmlContainerCell::Draw(wxDC& dc, int x, int y, int view_y1, int view_y
 	    
 	    pDCM->SetBrush(myb);
 	    pDCM->SetPen(*wxTRANSPARENT_PEN);
-	    pDCM->DrawRectangle(0, 0, sizeContainerCell.GetWidth(), sizeContainerCell.GetHeight());
+	    pDCM->DrawRectangle(0, 0, sizeBlit.GetWidth(), sizeBlit.GetHeight());
 	    
 	    pDCM->SetMapMode(wxMM_TEXT);
 	    pDCM->SetBackgroundMode(wxTRANSPARENT);
@@ -3872,8 +3881,8 @@ void MunkHtmlContainerCell::Draw(wxDC& dc, int x, int y, int view_y1, int view_y
 	    //dc.DestroyClippingRegion();
 
 	    dc.Blit(xlocal, ylocal, // xdest, ydest
-		    sizeContainerCell.GetWidth(),  // width
-		    sizeContainerCell.GetHeight(), // height
+		    sizeBlit.GetWidth(),  // width
+		    sizeBlit.GetHeight(), // height
 		    pDCM, // source
 		    0, 0); // xsource, ysource
 
