@@ -3094,6 +3094,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 			css_style += wxString::Format(wxT("margin-top : %dpx;"), margin_top);
 		} else {
 			if (tag == "p" 
+			    || tag == "center"
 			    || tag == "pre"
 			    || tag == "h1"
 			    || tag == "h2" 
@@ -7517,7 +7518,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		}
 	} else if (tag == "p" || tag == "pre"
-		   || tag == "h1" || tag == "h2" || tag == "h3") {
+		   || tag == "h1" || tag == "h2" || tag == "h3"
+		   || tag == "center") {
 		//if (GetContainer()->GetFirstChild() != NULL){
 			CloseContainer();
 			OpenContainer();
@@ -7538,7 +7540,11 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		wxString css_style;
 
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
-		GetContainer()->SetAlign(munkTag);
+		if (tag == "center") {
+			GetContainer()->SetAlignHor(MunkHTML_ALIGN_CENTER);
+		} else {
+			GetContainer()->SetAlign(munkTag);
+		}
 		GetContainer()->SetVAlign(munkTag);
 		GetContainer()->SetWidthFloat(munkTag);
 		GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
@@ -7583,7 +7589,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		// NONSTANDARD
 		GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
 
-		if (tag == "p") {
+		if (tag == "p"
+		    || tag == "center") {
 			this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
 		}
 
@@ -8512,7 +8519,8 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetContainer()->GetBackgroundColour(), MunkHTML_CLR_BACKGROUND));
 	} else if (tag == "p" || tag == "pre"
-		   || tag == "h1" || tag == "h2" || tag == "h3") {
+		   || tag == "h1" || tag == "h2" || tag == "h3"
+		   || tag == "center") {
 		endTag(); // ends startColor() from the start tag
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
 
