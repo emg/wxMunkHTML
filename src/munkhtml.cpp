@@ -8097,9 +8097,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		//c->SetIndent(GetCharHeight(), MunkHTML_INDENT_VERTICAL);
 		c->SetIndent(0, MunkHTML_INDENT_VERTICAL);
 		c->SetAlignHor(MunkHTML_ALIGN_CENTER);
-		c->SetAlign(munkTag);
 		c->SetVAlign(munkTag);
-		c->SetWidthFloat(munkTag);
+		c->SetWidthFloat(100.0, MunkHTML_UNITS_PERCENT);
 		c->SetHeight(munkTag, 1.0); // FIXME: What about printing?
 		sz = 2;
 		munkTag.GetParamAsInt(wxT("SIZE"), &sz);
