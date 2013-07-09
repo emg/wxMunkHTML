@@ -1757,17 +1757,18 @@ void MunkHtmlLineBreakCell::Layout(int w)
 class MunkHtmlLineCell : public MunkHtmlCell
 {
     public:
-        MunkHtmlLineCell(int size, bool shading) : MunkHtmlCell() {m_Height = size; m_HasShading = shading;}
+        MunkHtmlLineCell(int size, int width, bool shading) : MunkHtmlCell() {m_Height = size; m_SetWidth = width, m_HasShading = shading;}
         void Draw(wxDC& dc, int x, int y, int view_y1, int view_y2,
                   MunkHtmlRenderingInfo& info);
         void Layout(int w)
-            { m_Width = w; MunkHtmlCell::Layout(w); }
+	{ m_Width = (w < m_SetWidth) ? w : m_SetWidth; MunkHtmlCell::Layout(w); }
 
 	virtual bool IsTerminalCell() const { return true; }
 
     private:
         // Should we draw 3-D shading or not
       bool m_HasShading;
+      int m_SetWidth;
 
       DECLARE_NO_COPY_CLASS(MunkHtmlLineCell)
 };
@@ -8098,14 +8099,20 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		c->SetIndent(0, MunkHTML_INDENT_VERTICAL);
 		c->SetAlignHor(MunkHTML_ALIGN_CENTER);
 		c->SetVAlign(munkTag);
+
+		// We first set the width to 100%, so as to be able to
+		// center the line.
 		c->SetWidthFloat(100.0, MunkHTML_UNITS_PERCENT);
+
 		c->SetHeight(munkTag, 1.0); // FIXME: What about printing?
 		sz = 2;
 		munkTag.GetParamAsInt(wxT("SIZE"), &sz);
+		int myWidth = -1; // -1 means 'use width from parent'.
+		munkTag.GetParamAsInt(wxT("WIDTH"), &myWidth);
 		HasShading = !(munkTag.HasParam(wxT("NOSHADE")));
 		int myHeight = (int)((double)sz * 1.0);
 
-		c->InsertCell(new MunkHtmlLineCell(myHeight, HasShading));
+		c->InsertCell(new MunkHtmlLineCell(myHeight, myWidth, HasShading));
 		
 		CloseContainer();
 		OpenContainer();
