@@ -7595,10 +7595,14 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
 		}
 
+		// NONSTANDARD: Borders
+		this->SetBorders(tag, attrs, munkTag, css_style, GetContainer());
+
 		MunkMiniDOMTag *pMiniDOMTag = new MunkMiniDOMTag(tag, kStartTag);
 		if (!css_style.IsEmpty()) {
 			pMiniDOMTag->setAttr("style", std::string((const char*)css_style.ToUTF8()));
 		}
+
 
 		AddHtmlTagCell(pMiniDOMTag);
 
@@ -7855,12 +7859,16 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 
 		// NONSTANDARD: background_image and background_repeat
-		wxString css_style; // Not used for div.
+		wxString css_style; 
 		this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
 
 
 		// NONSTANDARD: Set margins and text_indent and padding
 		GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
+
+		// NONSTANDARD: Borders
+		this->SetBorders(tag, attrs, munkTag, css_style, GetContainer());
+
 
 		OpenContainer();
 
@@ -7868,6 +7876,13 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
 		GetContainer()->SetAlign(munkTag);
 		GetContainer()->SetVAlign(munkTag);
+
+
+
+		MunkMiniDOMTag *pMiniDOMTag = new MunkMiniDOMTag(tag, kStartTag);
+		if (!css_style.IsEmpty()) {
+			pMiniDOMTag->setAttr("style", std::string((const char*)css_style.ToUTF8()));
+		}
 
 		// OpenContainer();
 		// OpenContainer();
@@ -9259,20 +9274,6 @@ void MunkQDHTMLHandler::SetBorders(const std::string& tag,
 		}
 	} else {
 	*/
-		if (findBorder("border_top",
-			       attrs,
-			       direction,
-			       style,
-			       border_width,
-			       clr1,
-			       clr2,
-			       pixel_scale)) {
-			if (clr2 == clr1) {
-				clr2 = wxNullColour;
-			}
-			pContainer->SetBorder(MunkHTML_BORDER_TOP, style, border_width, clr1, clr2);
-		}
-		
 		if (findBorder("border_top",
 			       attrs,
 			       direction,
