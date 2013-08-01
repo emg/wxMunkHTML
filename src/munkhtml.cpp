@@ -1707,7 +1707,7 @@ class MunkHtmlListcontentCell : public MunkHtmlContainerCell
 public:
     MunkHtmlListcontentCell(MunkHtmlContainerCell *p) : MunkHtmlContainerCell(p) {}
     virtual void Layout(int w) {
-        // Reset top indentation, fixes <li><p>
+	    // Reset top indentation, fixes <li><p>
 	    SetIndent(0, MunkHTML_INDENT_TOP);
         MunkHtmlContainerCell::Layout(w);
     }
@@ -3140,6 +3140,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 
 			css_style += wxString::Format(wxT("margin-bottom : %dpx;"), margin_bottom);
 		} else {
+			int indent_bottom = 0;
 			if (tag == "h1" || tag == "h2" || tag == "h3") {
 				margin_bottom = 12; // pixels
 			} else {
@@ -3720,7 +3721,7 @@ void MunkHtmlContainerCell::Layout(int w)
 
 	// setup height & width, depending on container layout:
 	if (m_DeclaredHeight >= 0) {
-		m_Height = m_DeclaredHeight + m_IndentBottom;
+		m_Height = m_DeclaredHeight;
 	} else {
 		m_Height = ypos + (ysizedown + ysizeup) + m_IndentBottom;
 	}
@@ -7520,67 +7521,37 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 	} else if (tag == "p" || tag == "pre"
 		   || tag == "h1" || tag == "h2" || tag == "h3"
 		   || tag == "center") {
-		//if (GetContainer()->GetFirstChild() != NULL){
-			CloseContainer();
-			OpenContainer();
-
-
 		OpenContainer();
 
-
+		wxString css_style;
+		
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
-
-		// NONSTANDARD: background_image and background_repeat
-		wxString css_style; 
-		this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
-
-
-		// NONSTANDARD: Set margins and text_indent and padding
+		
+		// Set margins and TextIndent and padding
+		// NONSTANDARD
 		GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
-
+		
+		if (tag == "p"
+		    || tag == "center") {
+			this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
+		}
+		
 		// NONSTANDARD: Borders
 		this->SetBorders(tag, attrs, munkTag, css_style, GetContainer());
-
-
-		OpenContainer();
-
+		
+		//OpenContainer();
+		
+		
 		if (tag == "center") {
 			GetContainer()->SetAlignHor(MunkHTML_ALIGN_CENTER);
 		} else {
 			GetContainer()->SetAlign(munkTag);
 		}
+		GetContainer()->SetVAlign(munkTag);
 		GetContainer()->SetWidthFloat(munkTag);
 		GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
-		GetContainer()->SetAlign(munkTag);
-		GetContainer()->SetVAlign(munkTag);
-
-
-
-		MunkMiniDOMTag *pMiniDOMTag = new MunkMiniDOMTag(tag, kStartTag);
-		if (!css_style.IsEmpty()) {
-			pMiniDOMTag->setAttr("style", std::string((const char*)css_style.ToUTF8()));
-		}
-
-		// OpenContainer();
-		// OpenContainer();
-
-			//}
-		if (tag == "h1") {
-			startH1();
-		} else if (tag == "h2") {
-			startH2();
-		} else if (tag == "h3") {
-			startH3();
-		}
-
-	
-		if (tag == "h1" || tag == "h2" || tag == "h3") {
-			GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
-		}
-
-
 		GetContainer()->SetDirection(munkTag);
-
+		
 		if (tag == "pre") {
 			m_white_space_stack.push(kWSKPre);
 		} else {
@@ -7589,7 +7560,20 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		}
 		GetContainer()->SetWhiteSpaceKind(m_white_space_stack.top());
 
-
+		
+		if (tag == "h1") {
+			startH1();
+		} else if (tag == "h2") {
+			startH2();
+		} else if (tag == "h3") {
+			startH3();
+		}
+		
+		
+		if (tag == "h1" || tag == "h2" || tag == "h3") {
+			GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
+		}
+		
 		// NONSTANDARD
 		// Support COLOR attribute
 		wxColour newColor = GetActualColor();
@@ -7602,8 +7586,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				}
 			}
 		}
-
-
+		
+		
 		// Support BGCOLOR tag on <p> element.
 		// This is non-standard, but useful.
 		// NONSTANDARD		
@@ -7615,7 +7599,15 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				css_style += wxT("background-color : ") + munkTag.GetParam(wxT("BGCOLOR")) + wxT(';');
 			}
 		}
+		
+		MunkMiniDOMTag *pMiniDOMTag = new MunkMiniDOMTag(tag, kStartTag);
+		if (!css_style.IsEmpty()) {
+			pMiniDOMTag->setAttr("style", std::string((const char*)css_style.ToUTF8()));
+		}
 
+		
+		AddHtmlTagCell(pMiniDOMTag);
+		
 		startColor(newColor);
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
 
@@ -7859,11 +7851,13 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		}
 #endif
 	} else if (tag == "div") {
-		CloseContainer();
-		OpenContainer();
+		//CloseContainer();
+		//OpenContainer();
 
 
 		OpenContainer();
+
+
 
 
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
@@ -8117,7 +8111,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		int sz;
 		bool HasShading;
 		
-		CloseContainer();
+		//CloseContainer();
 		c = OpenContainer();
 		
 		//c->SetIndent(GetCharHeight(), MunkHTML_INDENT_VERTICAL);
@@ -8140,12 +8134,12 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		c->InsertCell(new MunkHtmlLineCell(myHeight, myWidth, HasShading));
 		
 		CloseContainer();
-		OpenContainer();
+		//OpenContainer();
 	} else if (tag == "pagebreak") {
 		int al = GetContainer()->GetAlignHor();
 		MunkHtmlContainerCell *c;
 
-		CloseContainer();
+		//CloseContainer();
 		c = OpenContainer();
 		c->SetAlignHor(al);
 
@@ -8155,6 +8149,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		c->SetAlign(munkTag);
 		c->SetVAlign(munkTag);
 		c->SetMinHeight(GetCharHeight());
+		CloseContainer();
 	} else if (tag == "table" || tag == "tr" || tag == "td" || tag == "th") {
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 		MunkHtmlContainerCell *c;
@@ -8286,20 +8281,23 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			}
 		}
 	} else if (tag == "dl") {
+		/*
 		if (GetContainer()->GetFirstChild() != NULL) {
 			CloseContainer();
 			OpenContainer();
 		}
+		*/
+		OpenContainer();
 		GetContainer()->SetIndent(GetCharHeight(), MunkHTML_INDENT_TOP);
 	} else if (tag == "dt") {
 		MunkHtmlContainerCell *c;
-		CloseContainer();
+		//CloseContainer();
 		c = OpenContainer();
 		c->SetAlignHor(MunkHTML_ALIGN_LEFT);
 		c->SetMinHeight(GetCharHeight());
         } else if (tag == "dd") {
 		MunkHtmlContainerCell *c;
-		CloseContainer();
+		//CloseContainer();
 		c = OpenContainer();
 		c->SetIndent(3 * GetCharWidth(), MunkHTML_INDENT_LEFT);
 	} else if (tag == "li") {
@@ -8312,6 +8310,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			MunkHtmlListCell *pList = m_list_cell_stack.top();
 
 			c = SetContainer(new MunkHtmlContainerCell(pList));
+			//c = OpenContainer();
 			c->SetAlignVer(MunkHTML_ALIGN_TOP);
 
 			MunkHtmlContainerCell *mark = c;
@@ -8331,7 +8330,9 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			CloseContainer();
 
 			c = OpenContainer();
-			
+			c->SetAlignVer(MunkHTML_ALIGN_TOP);
+			c->SetIndent(0, MunkHTML_INDENT_TOP);
+
 			pList->AddRow(mark, c);
 			c = OpenContainer();
 			SetContainer(new MunkHtmlListcontentCell(c));
@@ -8341,7 +8342,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			}
 		}
 	} else if (tag == "ul" || tag == "ol") {
-		CloseContainer();
+		//CloseContainer();
 
 		MunkHtmlContainerCell *c;
 
@@ -8524,6 +8525,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		if (m_pCanvas->GetParentMunkHtmlWindow() != NULL) {
 			m_pCanvas->GetParentMunkHtmlWindow()->SetHTMLBackgroundColour(bgcolour);
 		}
+		OpenContainer();
 	} else {
 		throw MunkQDException(std::string("Unknown start-tag: <") + tag + ">");
 	}
@@ -8552,6 +8554,8 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 	} else if (tag == "p" || tag == "pre"
 		   || tag == "h1" || tag == "h2" || tag == "h3"
 		   || tag == "center") {
+		//CloseContainer();
+		CloseContainer();
 		endTag(); // ends startColor() from the start tag
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
 
@@ -8574,8 +8578,6 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 			m_white_space_stack.pop();
 		}
 
-		CloseContainer();
-		CloseContainer();
 	} else if (tag == "br") {
 		; // Nothing to do
 	} else if (tag == "form") {
@@ -8664,34 +8666,46 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 	} else if (tag == "hr") {
 		; // Do nothing
 	} else if (tag == "dl") {
+		/*
 		if (GetContainer()->GetFirstChild() != NULL) {
 			CloseContainer();
 			OpenContainer();
 		}
-		GetContainer()->SetIndent(GetCharHeight(), MunkHTML_INDENT_TOP);
+		*/
+		CloseContainer();
+		//GetContainer()->SetIndent(GetCharHeight(), MunkHTML_INDENT_TOP);
 	} else if (tag == "dt") {
-		; // Do nothing
+		CloseContainer();
         } else if (tag == "dd") {
-		; // Do nothing
+		CloseContainer();
 	} else if (tag == "li") {
 		if (!m_list_cell_stack.empty()) {
 			CloseContainer();
-			CloseContainer();
-			CloseContainer();
+			//CloseContainer();
+
+			MunkHtmlListCell *pList = m_list_cell_stack.top();
+			SetContainer(pList);
 
 		}
 	} else if (tag == "ol" || tag == "ul") {
 		SetContainer(m_list_cell_stack.top());
 		CloseContainer();
 
-		m_list_cell_stack.pop();
-
 		std::pair<int, MunkHtmlContainerCell*> mypair = m_list_cell_info_stack.top();
 		m_list_cell_info_stack.pop();
 		
-		SetContainer(mypair.second);
+		//SetContainer(mypair.second);
+
+		m_list_cell_stack.pop();
+
+
+
+		//CloseContainer();	
+		CloseContainer();
+		/*
 		CloseContainer();
 		OpenContainer();
+		*/
 		m_Numbering = mypair.first;
 	} else if (tag == "html") {
 		; // Do nothing
@@ -8731,7 +8745,9 @@ void MunkQDHTMLHandler::endDocument(void) throw(MunkQDException)
 	//OpenContainer();
 	
 	top = m_pCurrentContainer;
-	while (top->GetParent()) top = top->GetParent();
+	while (top->GetParent()) {
+		top = top->GetParent();
+	}
 	top->RemoveExtraSpacing(true, true);
 	
 	m_pCanvas->SetTopCell(top);
