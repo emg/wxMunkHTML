@@ -3140,7 +3140,6 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 
 			css_style += wxString::Format(wxT("margin-bottom : %dpx;"), margin_bottom);
 		} else {
-			int indent_bottom = 0;
 			if (tag == "h1" || tag == "h2" || tag == "h3") {
 				margin_bottom = 12; // pixels
 			} else {
@@ -3721,7 +3720,7 @@ void MunkHtmlContainerCell::Layout(int w)
 
 	// setup height & width, depending on container layout:
 	if (m_DeclaredHeight >= 0) {
-		m_Height = m_DeclaredHeight;
+		m_Height = m_DeclaredHeight + m_IndentBottom;
 	} else {
 		m_Height = ypos + (ysizedown + ysizeup) + m_IndentBottom;
 	}
@@ -7524,6 +7523,47 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		//if (GetContainer()->GetFirstChild() != NULL){
 			CloseContainer();
 			OpenContainer();
+
+
+		OpenContainer();
+
+
+		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
+
+		// NONSTANDARD: background_image and background_repeat
+		wxString css_style; 
+		this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
+
+
+		// NONSTANDARD: Set margins and text_indent and padding
+		GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
+
+		// NONSTANDARD: Borders
+		this->SetBorders(tag, attrs, munkTag, css_style, GetContainer());
+
+
+		OpenContainer();
+
+		if (tag == "center") {
+			GetContainer()->SetAlignHor(MunkHTML_ALIGN_CENTER);
+		} else {
+			GetContainer()->SetAlign(munkTag);
+		}
+		GetContainer()->SetWidthFloat(munkTag);
+		GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
+		GetContainer()->SetAlign(munkTag);
+		GetContainer()->SetVAlign(munkTag);
+
+
+
+		MunkMiniDOMTag *pMiniDOMTag = new MunkMiniDOMTag(tag, kStartTag);
+		if (!css_style.IsEmpty()) {
+			pMiniDOMTag->setAttr("style", std::string((const char*)css_style.ToUTF8()));
+		}
+
+		// OpenContainer();
+		// OpenContainer();
+
 			//}
 		if (tag == "h1") {
 			startH1();
@@ -7538,17 +7578,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
 		}
 
-		wxString css_style;
 
-		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
-		if (tag == "center") {
-			GetContainer()->SetAlignHor(MunkHTML_ALIGN_CENTER);
-		} else {
-			GetContainer()->SetAlign(munkTag);
-		}
-		GetContainer()->SetVAlign(munkTag);
-		GetContainer()->SetWidthFloat(munkTag);
-		GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
 		GetContainer()->SetDirection(munkTag);
 
 		if (tag == "pre") {
@@ -7585,26 +7615,6 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				css_style += wxT("background-color : ") + munkTag.GetParam(wxT("BGCOLOR")) + wxT(';');
 			}
 		}
-
-		// Set margins and TextIndent and padding
-		// NONSTANDARD
-		GetContainer()->SetMarginsAndPaddingAndTextIndent(tag, munkTag, css_style, GetCharHeight());
-
-		if (tag == "p"
-		    || tag == "center") {
-			this->SetBackgroundImageAndBackgroundRepeat(tag, attrs, munkTag, css_style, GetContainer());
-		}
-
-		// NONSTANDARD: Borders
-		this->SetBorders(tag, attrs, munkTag, css_style, GetContainer());
-
-		MunkMiniDOMTag *pMiniDOMTag = new MunkMiniDOMTag(tag, kStartTag);
-		if (!css_style.IsEmpty()) {
-			pMiniDOMTag->setAttr("style", std::string((const char*)css_style.ToUTF8()));
-		}
-
-
-		AddHtmlTagCell(pMiniDOMTag);
 
 		startColor(newColor);
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
@@ -8563,6 +8573,9 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 			// We pushed it in the startElement stuff
 			m_white_space_stack.pop();
 		}
+
+		CloseContainer();
+		CloseContainer();
 	} else if (tag == "br") {
 		; // Nothing to do
 	} else if (tag == "form") {
