@@ -1697,7 +1697,9 @@ class MunkHtmlComboBoxPanel : public wxPanel {
 			      const std::string& name);
 	virtual ~MunkHtmlComboBoxPanel();
 
-	void OnSelect(wxCommandEvent& event);
+	virtual void OnSelect(wxCommandEvent& event);
+
+	virtual void SendFormSubmittedEvent();
 
 	void setSubmitOnSelect(bool bSubmitOnSelect) { m_bSubmitOnSelect = bSubmitOnSelect; };
 

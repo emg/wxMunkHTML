@@ -2640,8 +2640,9 @@ MunkHtmlWordCell::MunkHtmlWordCell(long SpaceWidth, long SpaceHeight, long Space
 
 void MunkHtmlWordCell::SetPreviousWord(MunkHtmlWordCell *cell)
 {
-    if ( cell && m_Parent == cell->m_Parent &&
-         !wxIsspace(cell->m_Word.Last()) && !wxIsspace(m_Word[0u]) )
+    if ( cell && m_Parent == cell->m_Parent
+	 && !(cell->m_Word.IsEmpty())
+	 && !wxIsspace(cell->m_Word.Last()) && !wxIsspace(m_Word[0u]) )
     {
         m_allowLinebreak = false;
     }
@@ -4724,14 +4725,27 @@ MunkHtmlComboBoxPanel::~MunkHtmlComboBoxPanel()
 {
 }
 
+void MunkHtmlComboBoxPanel::SendFormSubmittedEvent()
+{
+	wxCommandEvent event2(MunkEVT_COMMAND_HTML_FORM_SUBMITTED);
+	event2.SetString(wxString(m_name.c_str(), wxConvUTF8));
+	event2.SetInt(m_form_id);
+	
+	wxTheApp->AddPendingEvent(event2);
+}
+
 void MunkHtmlComboBoxPanel::OnSelect(wxCommandEvent& event)
 {
 	if (m_bSubmitOnSelect) {
-		wxCommandEvent event2(MunkEVT_COMMAND_HTML_FORM_SUBMITTED);
-		event2.SetString(wxString(m_name.c_str(), wxConvUTF8));
-		event2.SetInt(m_form_id);
-		
-		::wxPostEvent(m_pParent, event2);
+#if wxCHECK_VERSION(2, 9, 5)
+		// On wxWidgets 2.9.5 and later, we can use CallAfter
+		// to avoid breaking the Mouse Capture on Mac OS X.
+		CallAfter(&MunkHtmlComboBoxPanel::SendFormSubmittedEvent);
+#else
+		// On wxWidgets 2.9.4 and earlier, we need to
+		// call this method now.
+		SendFormSubmittedEvent();
+#endif
 	} else {
 		event.Skip();
 	}
