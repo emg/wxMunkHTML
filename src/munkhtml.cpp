@@ -6869,13 +6869,10 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
 		    if (wd.length() > 2 && wd.Right(2) == wxT("PX")) {
 			    wxSscanf(wd.c_str(), wxT("%ilPX"), &width);
 			    bUseIt = true;
-			    std::cerr << "UP317: wd = '" << wd.c_str() << "'\n";
 		    } else if ( wd.ToLong(&width) ) {
 			    bUseIt = true;
-			    std::cerr << "UP318: wd = '" << wd.c_str() << "'\n";
 		    } else {
 			    bUseIt = false;
-			    std::cerr << "UP319: wd = '" << wd.c_str() << "'\n";
 		    }
 
 		    if (bUseIt) {
