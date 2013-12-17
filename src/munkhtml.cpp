@@ -4125,12 +4125,13 @@ void MunkHtmlContainerCell::SetWidthFloat(const MunkHtmlTag& tag, double pixel_s
     {
         int wdi;
         wxString wd = tag.GetParam(wxT("WIDTH"));
+	wd.MakeUpper();
 
         if (wd[wd.length()-1] == wxT('%')) {
 		wxSscanf(wd.c_str(), wxT("%i%%"), &wdi);
 		SetWidthFloat(wdi, MunkHTML_UNITS_PERCENT);
-        } else if (wd.length() > 2 && wd.Right(2) == wxT("px")) {
-		wxSscanf(wd.c_str(), wxT("%ipx"), &wdi);
+        } else if (wd.length() > 2 && wd.Right(2) == wxT("PX")) {
+		wxSscanf(wd.c_str(), wxT("%iPX"), &wdi);
 		SetWidthFloat((int)(pixel_scale * (double)wdi), MunkHTML_UNITS_PIXELS);
 	} else {
 		wxSscanf(wd.c_str(), wxT("%i"), &wdi);
@@ -6847,16 +6848,42 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
         if (tag.HasParam(wxT("WIDTH")))
         {
             wxString wd = tag.GetParam(wxT("WIDTH"));
+	    wd.MakeUpper();
 
             if (wd[wd.length()-1] == wxT('%')) {
 		    if ( wxSscanf(wd.c_str(), wxT("%i%%"), &m_ColsInfo[c].width) == 1 ) {
 			    m_ColsInfo[c].units = MunkHTML_UNITS_PERCENT;
+			    // Here we don't let the cell know that it
+			    // is such and such many percent wide,
+			    // since this would circumvent the Table's
+			    // layout algorithm.
+
+			    // Instead, we let it know that it is 100%
+			    // of the width of whatever the table
+			    // calculates it should be.
+			    cell->SetWidthFloat(100, MunkHTML_UNITS_PERCENT);
 		    }
 	    } else {
-		    long width;
-		    if ( wd.ToLong(&width) ) {
+		    long width = 0;
+		    bool bUseIt = false;
+		    if (wd.length() > 2 && wd.Right(2) == wxT("PX")) {
+			    wxSscanf(wd.c_str(), wxT("%ilPX"), &width);
+			    bUseIt = true;
+			    std::cerr << "UP317: wd = '" << wd.c_str() << "'\n";
+		    } else if ( wd.ToLong(&width) ) {
+			    bUseIt = true;
+			    std::cerr << "UP318: wd = '" << wd.c_str() << "'\n";
+		    } else {
+			    bUseIt = false;
+			    std::cerr << "UP319: wd = '" << wd.c_str() << "'\n";
+		    }
+
+		    if (bUseIt) {
 			    m_ColsInfo[c].width = (int)(m_PixelScale * (double)width);
 			    m_ColsInfo[c].units = MunkHTML_UNITS_PIXELS;
+			    // This is necessary so as to let the cell
+			    // itself know, too, what its width is.
+			    cell->SetWidthFloat(m_ColsInfo[c].width, m_ColsInfo[c].units);
                  }
 		    
 	    }
@@ -8240,7 +8267,6 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 				// NONSTANDARD: Set width: DON'T do it: It is done in AddCell below!
 				// c->SetWidthFloat(munkTag, 1.0); // FIXME: What about printing?
-
 				m_tables_stack.top()->AddCell(c, munkTag);
 
 
