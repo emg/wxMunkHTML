@@ -8237,7 +8237,13 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 					m_rAlign = munkTag.GetParam(wxT("ALIGN"));
 			}  else { // new cell
 				c = SetContainer(new MunkHtmlContainerCell(m_tables_stack.top()));
+
+				// NONSTANDARD: Set width: DON'T do it: It is done in AddCell below!
+				// c->SetWidthFloat(munkTag, 1.0); // FIXME: What about printing?
+
 				m_tables_stack.top()->AddCell(c, munkTag);
+
+
 
 				if (tag == "td" || tag == "th") {
 					// NONSTANDARD: background_image and background_repeat
@@ -8278,9 +8284,6 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				if (tag == "td" || tag == "th") {
 					// NONSTANDARD: Set height
 					GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
-
-					// NONSTANDARD: Set width
-					GetContainer()->SetWidthFloat(munkTag, 1.0); // FIXME: What about printing?
 
 					// NONSTANDARD: direction (rtl|ltr)
 					GetContainer()->SetDirection(munkTag);
@@ -8672,6 +8675,7 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		m_tables_stack.pop();
 		m_white_space_stack.pop();
 	} else if (tag == "td" || tag == "th") {
+		CloseContainer();
 		CloseContainer();
 		CloseContainer();
 		m_white_space_stack.pop();
