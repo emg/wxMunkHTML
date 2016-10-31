@@ -633,8 +633,8 @@ public:
     // Call Layout at least once before using GetMaxTotalWidth()
     virtual int GetMaxTotalWidth() const { return m_Width; } 
 
-    int GetHeight() const {return m_Height;}
-    int GetDescent() const {return m_Descent;}
+    wxCoord GetHeight() const {return m_Height;}
+    wxCoord GetDescent() const {return m_Descent;}
 
     void SetScriptMode(MunkHtmlScriptMode mode, long previousBase);
     MunkHtmlScriptMode GetScriptMode() const { return m_ScriptMode; }
@@ -814,9 +814,9 @@ protected:
     MunkHtmlContainerCell *m_Parent;
 
     // dimensions of fragment (m_Descent is used to position text & images)
-    long m_Width, m_Height, m_Descent;
+    wxCoord m_Width, m_Height, m_Descent;
     // position where the fragment is drawn:
-    long m_PosX, m_PosY;
+    wxCoord m_PosX, m_PosY;
 
     // superscript/subscript/normal:
     MunkHtmlScriptMode m_ScriptMode;
@@ -2448,9 +2448,9 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
         // temporary variables used by AddText
 	MunkHtmlWordCell *m_lastWordCell;
 	std::string m_CurrentFontCharacteristicString;
-	long m_CurrentFontSpaceWidth;
-	long m_CurrentFontSpaceHeight;
-	long m_CurrentFontSpaceDescent;
+	wxCoord m_CurrentFontSpaceWidth;
+	wxCoord m_CurrentFontSpaceHeight;
+	wxCoord m_CurrentFontSpaceDescent;
 
 	// Table stuff
 	typedef std::stack<MunkHtmlTableCell*> TableCellStack;
