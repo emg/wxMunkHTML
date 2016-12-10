@@ -2348,10 +2348,14 @@ MunkHtmlCell::MunkHtmlCell() : wxObject()
     m_Next = NULL;
     m_Parent = NULL;
     m_Width = m_Height = m_Descent = 0;
+    m_PosX = m_PosY = 0;
     m_ScriptMode = MunkHTML_SCRIPT_NORMAL;        // <sub> or <sup> mode
     m_ScriptBaseline = 0;                       // <sub> or <sup> baseline
-    m_CanLiveOnPagebreak = true;
     m_Link = NULL;
+    m_CanLiveOnPagebreak = true;
+    m_id = wxT("");
+    m_bmpBg = wxNullBitmap;
+    m_nBackgroundRepeat = 0;
 }
 
 MunkHtmlCell::~MunkHtmlCell()
@@ -6869,13 +6873,10 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
 		    if (wd.length() > 2 && wd.Right(2) == wxT("PX")) {
 			    wxSscanf(wd.c_str(), wxT("%ilPX"), &width);
 			    bUseIt = true;
-			    std::cerr << "UP317: wd = '" << wd.c_str() << "'\n";
 		    } else if ( wd.ToLong(&width) ) {
 			    bUseIt = true;
-			    std::cerr << "UP318: wd = '" << wd.c_str() << "'\n";
 		    } else {
 			    bUseIt = false;
-			    std::cerr << "UP319: wd = '" << wd.c_str() << "'\n";
 		    }
 
 		    if (bUseIt) {
@@ -7420,6 +7421,9 @@ MunkQDHTMLHandler::MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMag
 	  m_nMagnification(nMagnification)
 {
 	m_CurrentFontCharacteristicString = "";
+	m_CurrentFontSpaceWidth = 0;
+	m_CurrentFontSpaceHeight = 0;
+	m_CurrentFontSpaceDescent = 0;
 	m_cur_form_id = 0;
 	m_pCanvas = pCanvas;
 	m_pDC = m_pCanvas->GetDC(); // new wxClientDC(pCanvas);
@@ -7465,6 +7469,13 @@ MunkQDHTMLHandler::MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMag
 
 MunkQDHTMLHandler::~MunkQDHTMLHandler()
 {
+	String2PFontMap::iterator it 
+		= m_HTML_font_map.begin();
+	while (it != m_HTML_font_map.end()) {
+		delete it->second;
+		++it;
+	}
+
 	delete[] m_tmpStrBuf;
 }
 
@@ -7499,6 +7510,134 @@ eWhiteSpaceKind MunkQDHTMLHandler::GetWhiteSpace(const MunkHtmlTag& munkTag)
 	}
 }
 
+void MunkQDHTMLHandler::pushFontAttrs(const std::string& tag, const MunkAttributeMap& attrs) throw(MunkQDException)
+{
+	MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
+
+	// Stay with the current one if <font> tag doesn't have COLOR
+	wxColour newColor = GetActualColor();
+
+	if (munkTag.HasParam(wxT("COLOR"))){
+		wxColour clr;
+		if (munkTag.GetParamAsColour(wxT("COLOR"), &clr)) {
+			newColor = clr;
+		}
+	}
+		
+	// GetContainer()->GetBackgroundColour()
+	wxColour newBackgroundColor = wxNullColour;
+	if (munkTag.HasParam(wxT("BGCOLOR"))) {
+		wxColour background_clr;
+		if (munkTag.GetParamAsColour(wxT("BGCOLOR"), &background_clr)) {
+			newBackgroundColor = background_clr;
+		}
+	}
+		
+	int newSizeFactor = GetActualFontSizeFactor();
+	if (munkTag.HasParam(wxT("SIZE"))) {
+		int tmp = 0;
+		wxChar c = munkTag.GetParam(wxT("SIZE")).GetChar(0);
+		if (munkTag.GetParamAsInt(wxT("SIZE"), &tmp)) {
+			int nCurrentSizeFactor = newSizeFactor;
+			int nNewPointSize = 0;
+			if (c == wxT('+') || c == wxT('-')) {
+				int nCurrentPointSize = ((int)(((DEFAULT_FONT_SIZE * nCurrentSizeFactor)))) / 100;
+				nNewPointSize = nCurrentPointSize + tmp;
+			} else {
+				nNewPointSize = tmp;
+			}
+
+			if (nNewPointSize < 7) {
+				nNewPointSize = 7;
+			} else if (nNewPointSize > 32) {
+				nNewPointSize = 32;
+			}
+			newSizeFactor = (int)((100.0 * nNewPointSize) / (DEFAULT_FONT_SIZE));
+		}
+	} else {
+		int nSizeFactorFactor = 10000; // 1.0
+		if (tag == "h1") {
+			nSizeFactorFactor = 15000; // 1.5em
+		} else if (tag == "h2") {
+			nSizeFactorFactor = 11000; // 1.1em
+		} else if (tag == "h3") {
+			nSizeFactorFactor = 10000; // 1.0em
+		}
+		newSizeFactor = (GetActualFontSizeFactor() * nSizeFactorFactor)/10000;
+	}
+
+	bool bHasFace = false;
+	wxString strFaceName = wxT("Arial");
+	if (attrs.find("face") != attrs.end()) {
+		std::list<std::string> face_name_list;
+
+		std::string face_list_string = getMunkAttribute(attrs, "face");
+		munk_split_string(face_list_string, ",", face_name_list);
+			
+		// Take first.
+		std::list<std::string>::const_iterator ci = face_name_list.begin();
+		std::string face_name = "Arial";
+		if (ci == face_name_list.end()) {
+			; // Just go with Arial
+		} else {
+			face_name = *ci;
+
+			// Only use it if it is non-empty
+			bHasFace = true;
+		}
+
+		strFaceName = wxString(face_name.c_str(), wxConvUTF8);
+	}
+
+	bool bIsBold = false;
+	if (attrs.find("font_weight") != attrs.end()) {
+		std::string font_weight = attrs.find("font_weight")->second;
+		if (font_weight == "bold"
+		    || font_weight == "bolder") {
+			bIsBold = true;
+		} else if (font_weight == "inherit") {
+			bIsBold = m_HTML_font_attribute_stack.top().m_bBold;
+		} else if (munk_string_is_number(font_weight)) {
+			long nFontWeight = munk_string2long(font_weight);
+			if (nFontWeight >= 700) {
+				bIsBold = true;
+			}
+		}
+	} else {
+		if (tag == "h1") {
+			bIsBold = true;
+		} else if (tag == "h2") {
+			bIsBold = true;
+		} else if (tag == "h3") {
+			bIsBold = true;
+		}
+	}
+
+	MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
+	current_font_attributes.m_color = newColor;
+	current_font_attributes.m_sizeFactor = newSizeFactor;
+	current_font_attributes.m_bBold = bIsBold;
+
+	if (bHasFace) {
+		current_font_attributes.setFace(strFaceName);
+	}
+		
+	m_HTML_font_attribute_stack.push(current_font_attributes);
+
+	GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
+	if (newBackgroundColor != wxNullColour) {
+		GetContainer()->InsertCell(new MunkHtmlColourCell(newBackgroundColor, MunkHTML_CLR_BACKGROUND));
+	}
+	GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));  
+}
+
+void MunkQDHTMLHandler::popFontAttrs(const std::string& tag) throw(MunkQDException)
+{
+	endTag();
+	GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
+	GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
+	GetContainer()->InsertCell(new MunkHtmlColourCell(GetContainer()->GetBackgroundColour(), MunkHTML_CLR_BACKGROUND));
+}
 
 void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttributeMap& attrs) throw(MunkQDException)
 {
@@ -7602,45 +7741,6 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		GetContainer()->SetWhiteSpaceKind(m_white_space_stack.top());
 
 		
-		if (tag == "h1") {
-			startH1();
-		} else if (tag == "h2") {
-			startH2();
-		} else if (tag == "h3") {
-			startH3();
-		}
-		
-		
-		if (tag == "h1" || tag == "h2" || tag == "h3") {
-			GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
-		}
-		
-		// NONSTANDARD
-		// Support COLOR attribute
-		wxColour newColor = GetActualColor();
-		if (munkTag.HasParam(wxT("COLOR"))){
-			wxColour clr;
-			if (munkTag.GetParamAsColour(wxT("COLOR"), &clr)) {
-				if (clr.Ok()) {
-					newColor = clr;
-					css_style += wxT("color : ") + munkTag.GetParam(wxT("COLOR")) + wxT(';');
-				}
-			}
-		}
-		
-		
-		// Support BGCOLOR tag on <p> element.
-		// This is non-standard, but useful.
-		// NONSTANDARD		
-		if (munkTag.HasParam(wxT("BGCOLOR"))) {
-			wxColour clrBkg;
-			munkTag.GetParamAsColour(wxT("BGCOLOR"), &clrBkg);
-			if (clrBkg.Ok()) {
-				GetContainer()->SetBackgroundColour(clrBkg);
-				css_style += wxT("background-color : ") + munkTag.GetParam(wxT("BGCOLOR")) + wxT(';');
-			}
-		}
-		
 		MunkMiniDOMTag *pMiniDOMTag = new MunkMiniDOMTag(tag, kStartTag);
 		if (!css_style.IsEmpty()) {
 			pMiniDOMTag->setAttr("style", std::string((const char*)css_style.ToUTF8()));
@@ -7649,10 +7749,9 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		
 		AddHtmlTagCell(pMiniDOMTag);
 		
-		startColor(newColor);
-		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
-
 		SetAlign(GetContainer()->GetAlignHor());
+
+		pushFontAttrs(tag, attrs);
 	} else if (tag == "br") {
 		GetContainer()->InsertCell(new MunkHtmlLineBreakCell(m_CurrentFontSpaceHeight, GetContainer()->GetFirstChild()));
 	} else if (tag == "form") {
@@ -7929,6 +8028,10 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			pMiniDOMTag->setAttr("style", std::string((const char*)css_style.ToUTF8()));
 		}
 
+		
+		AddHtmlTagCell(pMiniDOMTag);
+
+
 		// OpenContainer();
 		// OpenContainer();
 	} else if (tag == "b") {
@@ -8063,88 +8166,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			}
 		}
 	} else if (tag == "font") {
-		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
-
-		// Stay with the current one if <font> tag doesn't have COLOR
-		wxColour newColor = GetActualColor();
-
-		if (munkTag.HasParam(wxT("COLOR"))){
-			wxColour clr;
-			if (munkTag.GetParamAsColour(wxT("COLOR"), &clr)) {
-				newColor = clr;
-			}
-		}
-		
-		// GetContainer()->GetBackgroundColour()
-		wxColour newBackgroundColor = wxNullColour;
-		if (munkTag.HasParam(wxT("BGCOLOR"))) {
-			wxColour background_clr;
-			if (munkTag.GetParamAsColour(wxT("BGCOLOR"), &background_clr)) {
-				newBackgroundColor = background_clr;
-			}
-		}
-		
-		int newSizeFactor = GetActualFontSizeFactor();
-		if (munkTag.HasParam(wxT("SIZE"))) {
-			int tmp = 0;
-			wxChar c = munkTag.GetParam(wxT("SIZE")).GetChar(0);
-			if (munkTag.GetParamAsInt(wxT("SIZE"), &tmp)) {
-				int nCurrentSizeFactor = newSizeFactor;
-				int nNewPointSize = 0;
-				if (c == wxT('+') || c == wxT('-')) {
-					int nCurrentPointSize = ((int)(((DEFAULT_FONT_SIZE * nCurrentSizeFactor)))) / 100;
-					nNewPointSize = nCurrentPointSize + tmp;
-				} else {
-					nNewPointSize = tmp;
-				}
-
-				if (nNewPointSize < 7) {
-					nNewPointSize = 7;
-				} else if (nNewPointSize > 32) {
-					nNewPointSize = 32;
-				}
-				newSizeFactor = (int)((100.0 * nNewPointSize) / (DEFAULT_FONT_SIZE));
-			}
-		}
-
-		bool bHasFace = false;
-		wxString strFaceName = wxT("Arial");
-		if (attrs.find("face") != attrs.end()) {
-			std::list<std::string> face_name_list;
-
-			std::string face_list_string = getMunkAttribute(attrs, "face");
-			munk_split_string(face_list_string, ",", face_name_list);
-			
-			// Take first.
-			std::list<std::string>::const_iterator ci = face_name_list.begin();
-			std::string face_name = "Arial";
-			if (ci == face_name_list.end()) {
-				; // Just go with Arial
-			} else {
-				face_name = *ci;
-
-				// Only use it if it is non-empty
-				bHasFace = true;
-			}
-
-			strFaceName = wxString(face_name.c_str(), wxConvUTF8);
-		}
-
-		MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
-		current_font_attributes.m_color = newColor;
-		current_font_attributes.m_sizeFactor = newSizeFactor;
-
-		if (bHasFace) {
-			current_font_attributes.setFace(strFaceName);
-		}
-		
-		m_HTML_font_attribute_stack.push(current_font_attributes);
-
-		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
-		if (newBackgroundColor != wxNullColour) {
-			GetContainer()->InsertCell(new MunkHtmlColourCell(newBackgroundColor, MunkHTML_CLR_BACKGROUND));
-		}
-		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
+		pushFontAttrs(tag, attrs);
 	} else if (tag == "hr") {
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 
@@ -8191,6 +8213,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		c->SetVAlign(munkTag);
 		c->SetMinHeight(GetCharHeight());
 		CloseContainer();
+	} else if (tag == "tbody") {
+		// Simply ignore it.
 	} else if (tag == "table" || tag == "tr" || tag == "td" || tag == "th") {
 		MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 		MunkHtmlContainerCell *c;
@@ -8597,21 +8621,13 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 	} else if (tag == "p" || tag == "pre"
 		   || tag == "h1" || tag == "h2" || tag == "h3"
 		   || tag == "center") {
+		popFontAttrs(tag);
+		
 		//CloseContainer();
 		CloseContainer();
-		endTag(); // ends startColor() from the start tag
+		//endTag(); // ends startColor() from the start tag
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
 
-		if (tag == "h1"
-		   || tag == "h2"
-		   || tag == "h3") {
-			endTag();
-			GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
-			/*
-			CloseContainer();
-			OpenContainer();
-			*/
-		}
 		AddHtmlTagCell(new MunkMiniDOMTag(tag, kEndTag));
 
 		if (tag == "pre") {	
@@ -8648,6 +8664,8 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 	} else if (tag == "option") {
 		; // Nothing to do
 	} else if (tag == "div") {
+		AddHtmlTagCell(new MunkMiniDOMTag(tag, kEndTag));
+
 		CloseContainer();
 		CloseContainer();
 	} else if (tag == "b") {
@@ -8686,6 +8704,8 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 		MunkHtmlContainerCell *c = GetContainer();
 		c->SetIndent(GetCharHeight(), MunkHTML_INDENT_TOP);
 		*/
+	} else if (tag == "tbody") {
+		// Simply ignore it.
 	} else if (tag == "table") {
 		std::pair<std::pair<long,bool>, MunkHtmlContainerCell*> mypair = 
 			m_table_cell_info_stack.top();
@@ -8762,10 +8782,7 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 	} else if (tag == "img") {
 		; // Do nothing
 	} else if (tag == "font") {
-		endTag();
-		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
-		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
-		GetContainer()->InsertCell(new MunkHtmlColourCell(GetContainer()->GetBackgroundColour(), MunkHTML_CLR_BACKGROUND));
+		popFontAttrs(tag);
 	} else if (tag == "body") {
 		m_bInBody = false;
 	} else {
@@ -9656,37 +9673,6 @@ MunkHTMLFontAttributes MunkQDHTMLHandler::startSubscript(int newBaseline)
 }
 
 
-MunkHTMLFontAttributes MunkQDHTMLHandler::startH1(void)
-{
-	MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
-	current_font_attributes.m_bBold = true;
-	current_font_attributes.m_sizeFactor = 150;
-
-	m_HTML_font_attribute_stack.push(current_font_attributes);
-	return current_font_attributes;
-}
-
-
-MunkHTMLFontAttributes MunkQDHTMLHandler::startH2(void)
-{
-	MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
-	current_font_attributes.m_bBold = true;
-	current_font_attributes.m_sizeFactor = 110;
-
-	m_HTML_font_attribute_stack.push(current_font_attributes);
-	return current_font_attributes;
-}
-
-
-MunkHTMLFontAttributes MunkQDHTMLHandler::startH3(void)
-{
-	MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
-	current_font_attributes.m_bBold = true;
-	current_font_attributes.m_sizeFactor = 100;
-
-	m_HTML_font_attribute_stack.push(current_font_attributes);
-	return current_font_attributes;
-}
 
 
 MunkHTMLFontAttributes MunkQDHTMLHandler::startAnchorNAME(void)
@@ -9839,8 +9825,7 @@ wxFont *MunkQDHTMLHandler::CreateCurrentFont()
 			
 			m_FontSpaceCache.insert(std::make_pair(characteristic_string, MunkFontStringMetrics(m_CurrentFontSpaceWidth, m_CurrentFontSpaceHeight, m_CurrentFontSpaceDescent)));
 		} else {
-			m_CurrentFontSpaceWidth = it->second.m_StringWidth;
-			m_CurrentFontSpaceHeight = it->second.m_StringHeight;
+			m_CurrentFontSpaceWidth = it->second.m_StringWidth;			m_CurrentFontSpaceHeight = it->second.m_StringHeight;
 			m_CurrentFontSpaceDescent = it->second.m_StringDescent;
 		}
 

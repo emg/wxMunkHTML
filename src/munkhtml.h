@@ -633,8 +633,8 @@ public:
     // Call Layout at least once before using GetMaxTotalWidth()
     virtual int GetMaxTotalWidth() const { return m_Width; } 
 
-    wxCoord GetHeight() const {return m_Height;}
-    wxCoord GetDescent() const {return m_Descent;}
+    int GetHeight() const {return m_Height;}
+    int GetDescent() const {return m_Descent;}
 
     void SetScriptMode(MunkHtmlScriptMode mode, long previousBase);
     MunkHtmlScriptMode GetScriptMode() const { return m_ScriptMode; }
@@ -816,7 +816,7 @@ protected:
     // dimensions of fragment (m_Descent is used to position text & images)
     wxCoord m_Width, m_Height, m_Descent;
     // position where the fragment is drawn:
-    wxCoord m_PosX, m_PosY;
+    long m_PosX, m_PosY;
 
     // superscript/subscript/normal:
     MunkHtmlScriptMode m_ScriptMode;
@@ -2481,6 +2481,9 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	virtual void endDocument(void) throw(MunkQDException);
 	virtual void text(const std::string& str) throw(MunkQDException);
  protected:
+	void pushFontAttrs(const std::string& tag, const MunkAttributeMap& attrs) throw(MunkQDException);
+	void popFontAttrs(const std::string& tag) throw(MunkQDException);
+	
 	MunkHtmlContainerCell *GetContainer() const { return m_pCurrentContainer; };
 	MunkHtmlContainerCell *OpenContainer();
 	MunkHtmlContainerCell *CloseContainer();
@@ -2535,9 +2538,6 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	MunkHTMLFontAttributes startSmallCaps(void);
 	MunkHTMLFontAttributes startSuperscript(int newBaseline);
 	MunkHTMLFontAttributes startSubscript(int newBaseline);
-	MunkHTMLFontAttributes startH1(void);
-	MunkHTMLFontAttributes startH2(void);
-	MunkHTMLFontAttributes startH3(void);
 	MunkHTMLFontAttributes startAnchorHREF(bool bVisible, const wxColour& linkColour);
 	MunkHTMLFontAttributes startAnchorNAME(void);
 	MunkHTMLFontAttributes endTag(void);
