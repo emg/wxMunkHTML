@@ -1367,13 +1367,7 @@ wxString MunkHtmlTag::GetParam(const wxString& par, bool with_commas) const
 	}
 }
 
-int MunkHtmlTag::ScanParam(const wxString& par,
-			   const wxChar *format,
-			   void *param) const
-{
-    wxString parval = GetParam(par);
-    return wxSscanf(parval, format, param);
-}
+
 
 #define HTML_COLOUR(name, r, g, b)			\
 	if (str.IsSameAs(wxT(name), false)) {		\
@@ -1430,6 +1424,29 @@ bool MunkHtmlTag::GetParamAsInt(const wxString& par, int *clr) const
 		return false;
 	long i;
 	if ( !GetParam(par).ToLong(&i) )
+		return false;
+	
+	*clr = (int)i;
+	return true;
+}
+
+bool MunkHtmlTag::GetParamAsIntOrPercent(const wxString& par, int *clr, bool *isPercent) const
+{
+	if ( !HasParam(par) )
+		return false;
+
+	wxString strPar = GetParam(par);
+	if (strPar.Right(1) == wxT("%")) {
+		*isPercent = true;
+		strPar = strPar.Left(strPar.Length()-1);
+	} else if (strPar.Right(2).Upper() == wxT("PX")) {
+		*isPercent = false;
+		strPar = strPar.Left(strPar.Length()-2);
+	} else {
+		*isPercent = false;
+	}
+	long i;
+	if ( !strPar.ToLong(&i) )
 		return false;
 	
 	*clr = (int)i;
@@ -4128,17 +4145,12 @@ void MunkHtmlContainerCell::SetWidthFloat(const MunkHtmlTag& tag, double pixel_s
     if (tag.HasParam(wxT("WIDTH")))
     {
         int wdi;
-        wxString wd = tag.GetParam(wxT("WIDTH"));
-	wd.MakeUpper();
+	bool isPercent = false;
+	tag.GetParamAsIntOrPercent(wxT("WIDTH"), &wdi, &isPercent);
 
-        if (wd[wd.length()-1] == wxT('%')) {
-		wxSscanf(wd.c_str(), wxT("%i%%"), &wdi);
+        if (isPercent) {
 		SetWidthFloat(wdi, MunkHTML_UNITS_PERCENT);
-        } else if (wd.length() > 2 && wd.Right(2) == wxT("PX")) {
-		wxSscanf(wd.c_str(), wxT("%iPX"), &wdi);
-		SetWidthFloat((int)(pixel_scale * (double)wdi), MunkHTML_UNITS_PIXELS);
 	} else {
-		wxSscanf(wd.c_str(), wxT("%i"), &wdi);
 		SetWidthFloat((int)(pixel_scale * (double)wdi), MunkHTML_UNITS_PIXELS);
 		
         }
@@ -4152,13 +4164,8 @@ void MunkHtmlContainerCell::SetHeight(const MunkHtmlTag& tag, double pixel_scale
     if (tag.HasParam(wxT("HEIGHT")))
     {
         int wdi;
-        wxString wd = tag.GetParam(wxT("HEIGHT"));
 
-	if (wd.Right(2) == wxT("PX")) {
-		wd = wd.Left(wd.Length() - 2);
-	}
-
-	wxSscanf(wd.c_str(), wxT("%i"), &wdi);
+	tag.GetParamAsInt(wxT("HEIGHT"), &wdi);
 	SetDeclaredHeight(((int)(pixel_scale * (double)wdi)));
 
         m_LastLayout = -1;
@@ -6851,33 +6858,23 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
     {
         if (tag.HasParam(wxT("WIDTH")))
         {
-            wxString wd = tag.GetParam(wxT("WIDTH"));
-	    wd.MakeUpper();
-
-            if (wd[wd.length()-1] == wxT('%')) {
-		    if ( wxSscanf(wd.c_str(), wxT("%i%%"), &m_ColsInfo[c].width) == 1 ) {
-			    m_ColsInfo[c].units = MunkHTML_UNITS_PERCENT;
-			    // Here we don't let the cell know that it
-			    // is such and such many percent wide,
-			    // since this would circumvent the Table's
-			    // layout algorithm.
-
-			    // Instead, we let it know that it is 100%
-			    // of the width of whatever the table
-			    // calculates it should be.
-			    cell->SetWidthFloat(100, MunkHTML_UNITS_PERCENT);
-		    }
+	    bool isPercent = false;
+	    int wdi = 0;
+	    bool bUseIt = tag.GetParamAsIntOrPercent(wxT("WIDTH"), &wdi, &isPercent);
+	    
+	    if (bUseIt && isPercent) {
+		    m_ColsInfo[c].units = MunkHTML_UNITS_PERCENT;
+		    // Here we don't let the cell know that it
+		    // is such and such many percent wide,
+		    // since this would circumvent the Table's
+		    // layout algorithm.
+		    
+		    // Instead, we let it know that it is 100%
+		    // of the width of whatever the table
+		    // calculates it should be.
+		    cell->SetWidthFloat(100, MunkHTML_UNITS_PERCENT);
 	    } else {
-		    long width = 0;
-		    bool bUseIt = false;
-		    if (wd.length() > 2 && wd.Right(2) == wxT("PX")) {
-			    wxSscanf(wd.c_str(), wxT("%ilPX"), &width);
-			    bUseIt = true;
-		    } else if ( wd.ToLong(&width) ) {
-			    bUseIt = true;
-		    } else {
-			    bUseIt = false;
-		    }
+		    long width = wdi;
 
 		    if (bUseIt) {
 			    m_ColsInfo[c].width = (int)(m_PixelScale * (double)width);
@@ -8246,15 +8243,18 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			// width:
 			{
 				if (munkTag.HasParam(wxT("WIDTH"))) {
-					wxString wd = munkTag.GetParam(wxT("WIDTH"));
+					int wdi = 0;
+					bool isPercent = false;
+					bool bUseIt = munkTag.GetParamAsIntOrPercent(wxT("WIDTH"), &wdi, &isPercent);
 					
-					if (wd[wd.length()-1] == wxT('%')) {
-						int width = 0;
-						wxSscanf(wd.c_str(), wxT("%i%%"), &width);
+					if (!bUseIt) {
+						// Base case: 100% if we did not parse it correctly.
+						pTable->SetWidthFloat(100, MunkHTML_UNITS_PERCENT);
+					} else if (isPercent) {
+						int width = wdi;
 						pTable->SetWidthFloat(width, MunkHTML_UNITS_PERCENT);
 					} else {
-						int width = 0;
-						wxSscanf(wd.c_str(), wxT("%i"), &width);
+						int width = wdi;
 						pTable->SetWidthFloat((int)(1.0 * width), MunkHTML_UNITS_PIXELS);
 					}
 				} else {
