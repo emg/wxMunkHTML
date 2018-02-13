@@ -375,18 +375,10 @@ public:
     // Convenience functions:
     bool GetParamAsColour(const wxString& par, wxColour *clr) const;
     bool GetParamAsInt(const wxString& par, int *clr) const;
+    bool GetParamAsIntOrPercent(const wxString& par, int *clr, bool *isPercent) const;
     bool GetParamAsLengthInInches(const wxString& par, double *inches) const;
     bool GetParamAsLength(const wxString& par, int *pixels, double inches_to_pixels_factor) const;
 
-
-    // Scans param like scanf() functions family does.
-    // Example : ScanParam("COLOR", "\"#%X\"", &clr);
-    // This is always with with_commas=false
-    // Returns number of scanned values
-    // (like sscanf() does)
-    // NOTE: unlike scanf family, this function only accepts
-    //       *one* parameter !
-    int ScanParam(const wxString& par, const wxChar *format, void *param) const;
 
     // Returns string containing all params.
     wxString GetAllParams() const;
@@ -814,7 +806,7 @@ protected:
     MunkHtmlContainerCell *m_Parent;
 
     // dimensions of fragment (m_Descent is used to position text & images)
-    long m_Width, m_Height, m_Descent;
+    wxCoord m_Width, m_Height, m_Descent;
     // position where the fragment is drawn:
     long m_PosX, m_PosY;
 
@@ -2448,9 +2440,9 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
         // temporary variables used by AddText
 	MunkHtmlWordCell *m_lastWordCell;
 	std::string m_CurrentFontCharacteristicString;
-	long m_CurrentFontSpaceWidth;
-	long m_CurrentFontSpaceHeight;
-	long m_CurrentFontSpaceDescent;
+	wxCoord m_CurrentFontSpaceWidth;
+	wxCoord m_CurrentFontSpaceHeight;
+	wxCoord m_CurrentFontSpaceDescent;
 
 	// Table stuff
 	typedef std::stack<MunkHtmlTableCell*> TableCellStack;
@@ -2481,6 +2473,9 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	virtual void endDocument(void) throw(MunkQDException);
 	virtual void text(const std::string& str) throw(MunkQDException);
  protected:
+	void pushFontAttrs(const std::string& tag, const MunkAttributeMap& attrs) throw(MunkQDException);
+	void popFontAttrs(const std::string& tag) throw(MunkQDException);
+	
 	MunkHtmlContainerCell *GetContainer() const { return m_pCurrentContainer; };
 	MunkHtmlContainerCell *OpenContainer();
 	MunkHtmlContainerCell *CloseContainer();
@@ -2535,9 +2530,6 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	MunkHTMLFontAttributes startSmallCaps(void);
 	MunkHTMLFontAttributes startSuperscript(int newBaseline);
 	MunkHTMLFontAttributes startSubscript(int newBaseline);
-	MunkHTMLFontAttributes startH1(void);
-	MunkHTMLFontAttributes startH2(void);
-	MunkHTMLFontAttributes startH3(void);
 	MunkHTMLFontAttributes startAnchorHREF(bool bVisible, const wxColour& linkColour);
 	MunkHTMLFontAttributes startAnchorNAME(void);
 	MunkHTMLFontAttributes endTag(void);
