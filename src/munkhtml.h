@@ -1235,7 +1235,7 @@ class MunkHtmlLineBreakCell : public MunkHtmlCell
 class MunkHtmlColourCell : public MunkHtmlCell
 {
 public:
- MunkHtmlColourCell(const wxColour& clr, int flags = MunkHTML_CLR_FOREGROUND) : MunkHtmlCell() {m_Colour = clr; m_Flags = flags; m_Brush = wxBrush(m_Colour, wxSOLID); }
+ MunkHtmlColourCell(const wxColour& clr, int flags = MunkHTML_CLR_FOREGROUND) : MunkHtmlCell() {m_Colour = clr; m_Flags = flags; m_Brush = wxBrush(m_Colour, wxBRUSHSTYLE_SOLID); }
     virtual void Draw(wxDC& dc, int x, int y, int view_y1, int view_y2,
                       MunkHtmlRenderingInfo& info);
     virtual void DrawInvisible(wxDC& dc, int x, int y,

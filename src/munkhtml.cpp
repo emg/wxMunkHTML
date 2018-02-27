@@ -1589,7 +1589,7 @@ class MunkHtmlListmarkCell : public MunkHtmlCell
     DECLARE_NO_COPY_CLASS(MunkHtmlListmarkCell)
 };
 
-MunkHtmlListmarkCell::MunkHtmlListmarkCell(wxDC* dc, const wxColour& clr) : MunkHtmlCell(), m_Brush(clr, wxSOLID)
+MunkHtmlListmarkCell::MunkHtmlListmarkCell(wxDC* dc, const wxColour& clr) : MunkHtmlCell(), m_Brush(clr, wxBRUSHSTYLE_SOLID)
 {
     m_Width =  dc->GetCharHeight();
     m_Height = dc->GetCharHeight();
@@ -1795,8 +1795,8 @@ void MunkHtmlLineCell::Draw(wxDC& dc, int x, int y,
                           int WXUNUSED(view_y1), int WXUNUSED(view_y2),
                           MunkHtmlRenderingInfo& WXUNUSED(info))
 {
-    wxBrush mybrush(wxT("GREY"), (m_HasShading) ? wxTRANSPARENT : wxSOLID);
-    wxPen mypen(wxT("GREY"), 1, wxSOLID);
+    wxBrush mybrush(wxT("GREY"), (m_HasShading) ? wxBRUSHSTYLE_TRANSPARENT : wxBRUSHSTYLE_SOLID);
+    wxPen mypen(wxT("GREY"), 1, wxPENSTYLE_SOLID);
     dc.SetBrush(mybrush);
     dc.SetPen(mypen);
     dc.DrawRectangle(x + m_PosX, y + m_PosY, m_Width, m_Height);
@@ -2806,7 +2806,7 @@ static void SwitchSelState(wxDC& dc, MunkHtmlRenderingInfo& info,
 	if (selBg != wxNullColour) {
 		dc.SetTextBackground(selBg);
 		dc.SetBackground(wxBrush(selBg,
-					 wxSOLID));
+					 wxBRUSHSTYLE_SOLID));
 	}
     } else if (info.GetState().GetBgColour() != wxNullColour
 	       && info.GetState().GetBgColour() != info.GetWindowBackgroundColour()) {
@@ -2816,7 +2816,7 @@ static void SwitchSelState(wxDC& dc, MunkHtmlRenderingInfo& info,
 	}
 	if (bg != wxNullColour) {
 		dc.SetTextBackground(bg);
-		dc.SetBackground(wxBrush(bg, wxSOLID));
+		dc.SetBackground(wxBrush(bg, wxBRUSHSTYLE_SOLID));
 	}
     } 
     else
@@ -2827,7 +2827,7 @@ static void SwitchSelState(wxDC& dc, MunkHtmlRenderingInfo& info,
 	}
 	if (bg != wxNullColour) {
 		dc.SetTextBackground(bg);
-		dc.SetBackground(wxBrush(bg, wxSOLID));
+		dc.SetBackground(wxBrush(bg, wxBRUSHSTYLE_SOLID));
 	}
     }
 }
@@ -2922,7 +2922,7 @@ void MunkHtmlWordCell::Draw(wxDC& dc, int x, int y,
 	    }
 	    dc.SetPen(wxPen(penColour,
 			    1, // width
-			    wxSOLID));
+			    wxPENSTYLE_SOLID));
 	    dc.DrawLine(x + m_PosX, y + m_PosY + m_Height - m_Descent, x + m_PosX + m_Width + 1, y + m_PosY + m_Height - m_Descent);
 	    dc.SetPen(wxNullPen);
     }
@@ -3825,7 +3825,7 @@ void MunkHtmlContainerCell::Draw(wxDC& dc, int x, int y, int view_y1, int view_y
 	    } else {
 		    colorToUse = *wxWHITE; // Default to white. FIXME: Default to the bgcolor of the MunkHtmlWindow.
 	    }
-	    wxBrush myb = wxBrush(colorToUse, wxSOLID);
+	    wxBrush myb = wxBrush(colorToUse, wxBRUSHSTYLE_SOLID);
 	    
 	    int real_y1 = mMax(ylocal, view_y1);
 	    int real_y2 = mMin(ylocal + m_Height - 1, view_y2);
@@ -3870,7 +3870,7 @@ void MunkHtmlContainerCell::Draw(wxDC& dc, int x, int y, int view_y1, int view_y
 	    } else {
 		    colorToUse = *wxWHITE; // Default to white. FIXME: Default to the bgcolor of the MunkHtmlWindow.
 	    }
-	    wxBrush myb = wxBrush(colorToUse, wxSOLID);
+	    wxBrush myb = wxBrush(colorToUse, wxBRUSHSTYLE_SOLID);
 	    
 	    pDCM->SetBrush(myb);
 	    pDCM->SetPen(*wxTRANSPARENT_PEN);
@@ -3922,14 +3922,14 @@ void MunkHtmlContainerCell::Draw(wxDC& dc, int x, int y, int view_y1, int view_y
 		    break;
 	    case MunkHTML_BORDER_STYLE_SOLID: 
 		    {
-			    wxPen mypen1(m_BorderColour1Top, m_BorderWidthTop, wxSOLID);
+			    wxPen mypen1(m_BorderColour1Top, m_BorderWidthTop, wxPENSTYLE_SOLID);
 			    dc.SetPen(mypen1);
 			    dc.DrawLine(xlocal, ylocal, xlocal + m_Width, ylocal);
 			    break;
 		    }
 	    case MunkHTML_BORDER_STYLE_OUTSET: 
 		    {
-			    wxPen mypen1(m_BorderColour1Top, m_BorderWidthTop, wxSOLID);
+			    wxPen mypen1(m_BorderColour1Top, m_BorderWidthTop, wxPENSTYLE_SOLID);
 			    dc.SetPen(mypen1);
 			    dc.DrawLine(xlocal, ylocal, xlocal + m_Width, ylocal);
 			    break;
@@ -3941,14 +3941,14 @@ void MunkHtmlContainerCell::Draw(wxDC& dc, int x, int y, int view_y1, int view_y
 		    break;
 	    case MunkHTML_BORDER_STYLE_SOLID: 
 		    {
-			    wxPen mypen1(m_BorderColour1Right, m_BorderWidthRight, wxSOLID);
+			    wxPen mypen1(m_BorderColour1Right, m_BorderWidthRight, wxPENSTYLE_SOLID);
 			    dc.SetPen(mypen1);
 			    dc.DrawLine(xlocal + m_Width - 1, ylocal, xlocal +  m_Width - 1, ylocal + m_Height - 1);
 			    break;
 		    }
 	    case MunkHTML_BORDER_STYLE_OUTSET: 
 		    {
-			    wxPen mypen2(m_BorderColour2Right, m_BorderWidthRight, wxSOLID);
+			    wxPen mypen2(m_BorderColour2Right, m_BorderWidthRight, wxPENSTYLE_SOLID);
 			    dc.SetPen(mypen2);
 			    dc.DrawLine(xlocal + m_Width - 1, ylocal, xlocal +  m_Width - 1, ylocal + m_Height - 1);
 			    break;
@@ -3960,14 +3960,14 @@ void MunkHtmlContainerCell::Draw(wxDC& dc, int x, int y, int view_y1, int view_y
 		    break;
 	    case MunkHTML_BORDER_STYLE_SOLID: 
 		    {
-			    wxPen mypen1(m_BorderColour1Bottom, m_BorderWidthBottom, wxSOLID);
+			    wxPen mypen1(m_BorderColour1Bottom, m_BorderWidthBottom, wxPENSTYLE_SOLID);
 			    dc.SetPen(mypen1);
 			    dc.DrawLine(xlocal, ylocal + m_Height - 1, xlocal + m_Width, ylocal + m_Height - 1);
 			    break;
 		    }
 	    case MunkHTML_BORDER_STYLE_OUTSET: 
 		    {
-			    wxPen mypen2(m_BorderColour2Bottom, m_BorderWidthBottom, wxSOLID);
+			    wxPen mypen2(m_BorderColour2Bottom, m_BorderWidthBottom, wxPENSTYLE_SOLID);
 			    dc.SetPen(mypen2);
 			    dc.DrawLine(xlocal, ylocal + m_Height - 1, xlocal + m_Width, ylocal + m_Height - 1);
 			    break;
@@ -3979,14 +3979,14 @@ void MunkHtmlContainerCell::Draw(wxDC& dc, int x, int y, int view_y1, int view_y
 		    break;
 	    case MunkHTML_BORDER_STYLE_SOLID: 
 		    {
-			    wxPen mypen1(m_BorderColour1Left, m_BorderWidthLeft, wxSOLID);
+			    wxPen mypen1(m_BorderColour1Left, m_BorderWidthLeft, wxPENSTYLE_SOLID);
 			    dc.SetPen(mypen1);
 			    dc.DrawLine(xlocal, ylocal, xlocal, ylocal + m_Height - 1);
 			    break;
 		    }
 	    case MunkHTML_BORDER_STYLE_OUTSET: 
 		    {
-			    wxPen mypen1(m_BorderColour1Left, m_BorderWidthLeft, wxSOLID);
+			    wxPen mypen1(m_BorderColour1Left, m_BorderWidthLeft, wxPENSTYLE_SOLID);
 			    dc.SetPen(mypen1);
 			    dc.DrawLine(xlocal, ylocal, xlocal, ylocal + m_Height - 1);
 
@@ -4541,7 +4541,7 @@ void MunkHtmlColourCell::DrawInvisible(wxDC& dc,
 		    wxColour c = info.GetStyle().GetSelectedTextBgColour(m_Colour);
 		    if (c != wxNullColour) {
 			    dc.SetTextBackground(c);
-			    dc.SetBackground(wxBrush(c, wxSOLID));
+			    dc.SetBackground(wxBrush(c, wxBRUSHSTYLE_SOLID));
 		    }
 	    }
     }
@@ -5967,7 +5967,7 @@ void MunkHtmlWindow::PaintBackground(wxDC& dc)
   
     if ( !m_bmpBg.Ok() )
     {
-        dc.SetBackground(wxBrush(GetBackgroundColour(), wxSOLID));
+        dc.SetBackground(wxBrush(GetBackgroundColour(), wxBRUSHSTYLE_SOLID));
         dc.Clear();
 
         return;
@@ -5978,7 +5978,7 @@ void MunkHtmlWindow::PaintBackground(wxDC& dc)
     // result in extra flicker without any other effect as background is
     // completely covered anyhow
     if ( m_bmpBg.GetMask() ) {
-	    dc.SetBackground(wxBrush(GetBackgroundColour(), wxSOLID));
+	    dc.SetBackground(wxBrush(GetBackgroundColour(), wxBRUSHSTYLE_SOLID));
 	    dc.Clear();
     } else {
 	    // However, with the new feature of repeat-x and repeat-y for the
@@ -5988,7 +5988,7 @@ void MunkHtmlWindow::PaintBackground(wxDC& dc)
 	    if (!bgcolour.Ok()) {
 		    bgcolour = *wxWHITE;
 	    }
-	    dc.SetBackground(wxBrush(bgcolour, wxSOLID));
+	    dc.SetBackground(wxBrush(bgcolour, wxBRUSHSTYLE_SOLID));
 	    dc.Clear();
     }
 
@@ -6873,26 +6873,12 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
 		    // of the width of whatever the table
 		    // calculates it should be.
 		    cell->SetWidthFloat(100, MunkHTML_UNITS_PERCENT);
-	    } else {
-		    long width = 0;
-		    bool bUseIt = false;
-		    if (wd.length() > 2 && wd.Right(2) == wxT("PX")) {
-			    wxSscanf(wd.c_str(), wxT("%ilPX"), &width);
-			    bUseIt = true;
-		    } else if ( wd.ToLong(&width) ) {
-			    bUseIt = true;
-		    } else {
-			    bUseIt = false;
-		    }
-
-		    if (bUseIt) {
-			    m_ColsInfo[c].width = (int)(m_PixelScale * (double)width);
-			    m_ColsInfo[c].units = MunkHTML_UNITS_PIXELS;
-			    // This is necessary so as to let the cell
-			    // itself know, too, what its width is.
-			    cell->SetWidthFloat(m_ColsInfo[c].width, m_ColsInfo[c].units);
-                 }
-		    
+	    } else if (bUseIt) {
+		    m_ColsInfo[c].width = (int)(m_PixelScale * (double)wdi);
+		    m_ColsInfo[c].units = MunkHTML_UNITS_PIXELS;
+		    // This is necessary so as to let the cell
+		    // itself know, too, what its width is.
+		    cell->SetWidthFloat(m_ColsInfo[c].width, m_ColsInfo[c].units);
 	    }
         }
     }
@@ -8085,7 +8071,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		MunkHtmlContainerCell *cont = GetContainer();
 		MunkHtmlCell *c = cont->GetLastChild();
 
-		startSuperscript(oldbase + c ? c->GetScriptBaseline() : 0);
+		startSuperscript(oldbase + (c ? c->GetScriptBaseline() : 0));
 
 		cont->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
 	} else if (tag == "sub") {
@@ -8095,7 +8081,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		MunkHtmlContainerCell *cont = GetContainer();
 		MunkHtmlCell *c = cont->GetLastChild();
 
-		startSubscript(oldbase + c ? c->GetScriptBaseline() : 0);
+		startSubscript(oldbase + (c ? c->GetScriptBaseline() : 0));
 
 		cont->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
 		/*
@@ -8828,7 +8814,7 @@ void MunkQDHTMLHandler::AddText(const std::string& str)
 	size_t i = 0,
 		x,
 		lng = str.length();
-	register wxChar d;
+	wxChar d;
 	wxChar nbsp = 160;
 	
 	eWhiteSpaceKind white_space_constant = m_white_space_stack.top();
@@ -9009,7 +8995,7 @@ void MunkQDHTMLHandler::AddText(const std::string& str)
 	size_t i = 0,
 		x,
 		lng = wxStrlen(txt);
-	register wxChar d;
+	wxChar d;
 	int templen = 0;
 	wxChar nbsp = 160;
 	
