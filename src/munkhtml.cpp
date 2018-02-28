@@ -5416,7 +5416,15 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 	bool bResult = true;
 	error_message = "";
 	MunkHtmlParsingStructure ps(this);
-	ps.SetDC(dc, 1.0);
+
+	double pixel_scale = 1.0;
+#if wxCHECK_VERSION(3,1,0)
+	pixel_scale = this->GetContentScaleFactor();
+#else
+	pixel_scale = 1.0;
+#endif
+	
+	ps.SetDC(dc, pixel_scale);
 	ps.SetFS(GetFS());
 	ps.SetHTMLBackgroundColour(this->GetHTMLBackgroundColour());
 	try {
