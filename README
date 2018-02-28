@@ -10,7 +10,7 @@ wxWidgets site, <http://www.wxwidgets.org>.
 For what (X)HTML the code accepts, please see the code.
 
 The code is self-contained, and needs no other dependencies than
-wxWidgets (2.8.X and 2.9.X) and its dependencies.
+wxWidgets (2.8.X and 3.Y.Z) and its dependencies.
 
 The code is licensed under the wxWidgets license version 3.1.
 
