@@ -2348,7 +2348,7 @@ class MunkHtmlParsingStructure {
 	virtual void SetHTMLBackgroundColour(const wxColour& bgcol);
 	virtual wxColour GetHTMLBackgroundColour() const;
 
-	double GetPixelScale(void) const { return m_dblPixel_scale; };
+	double GetPixelScale(void) const { return 1.0; /* return m_dblPixel_scale; */ };
 
 	// Returns pointer to conteiners/cells structure.
 	// It should be used ONLY when printing

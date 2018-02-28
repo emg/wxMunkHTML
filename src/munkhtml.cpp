@@ -18,6 +18,7 @@
     #include "wx/brush.h"
     #include "wx/colour.h"
     #include "wx/dc.h"
+    #include "wx/dcbuffer.h"
     #include "wx/settings.h"
     #include "wx/module.h"
     #include "wx/scrolwin.h"
@@ -2067,7 +2068,7 @@ class MunkHtmlImageCell : public MunkHtmlCell
 {
 public:
 	MunkHtmlImageCell(MunkHtmlWindowInterface *windowIface,
-			  wxFSFile *input, int w, int h,
+			  wxFSFile *input, double scaleHDPI, int w, int h,
 			  double scale, int align = MunkHTML_ALIGN_BOTTOM,
 			  const wxString& mapname = wxEmptyString);
 	virtual ~MunkHtmlImageCell();
@@ -2075,7 +2076,7 @@ public:
 		  MunkHtmlRenderingInfo& info);
 	virtual MunkHtmlLinkInfo *GetLink(int x = 0, int y = 0) const;
 	
-	void SetImage(const wxImage& img);
+	void SetImage(const wxImage& img, double scaleHDPI);
 	void SetDescent(int descent);
 
 	virtual bool IsTerminalCell() const { return true; }
@@ -2101,9 +2102,10 @@ private:
 
 
 MunkHtmlImageCell::MunkHtmlImageCell(MunkHtmlWindowInterface *windowIface,
-                                 wxFSFile *input,
-                                 int w, int h, double scale, int align,
-                                 const wxString& mapname) : MunkHtmlCell()
+				     wxFSFile *input,
+				     double scaleHDPI,
+				     int w, int h, double scale, int align,
+				     const wxString& mapname) : MunkHtmlCell()
 {
     m_windowIface = windowIface;
     m_scale = scale;
@@ -2126,7 +2128,7 @@ MunkHtmlImageCell::MunkHtmlImageCell(MunkHtmlWindowInterface *windowIface,
                 {
                     wxImage image(*s, wxBITMAP_TYPE_ANY);
                     if ( image.Ok() )
-                        SetImage(image);
+			    SetImage(image, scaleHDPI);
                 }
             }
         }
@@ -2172,7 +2174,7 @@ void MunkHtmlImageCell::SetDescent(int descent)
 	m_Descent = descent;
 }
 
-void MunkHtmlImageCell::SetImage(const wxImage& img)
+void MunkHtmlImageCell::SetImage(const wxImage& img, double scaleHDPI)
 {
 #if !defined(__WXMSW__) || wxUSE_WXDIB
     if ( img.Ok() )
@@ -2184,9 +2186,9 @@ void MunkHtmlImageCell::SetImage(const wxImage& img)
         hh = img.GetHeight();
 
         if ( m_bmpW == wxDefaultCoord )
-            m_bmpW = ww;
+            m_bmpW = ww / scaleHDPI;
         if ( m_bmpH == wxDefaultCoord )
-            m_bmpH = hh;
+            m_bmpH = hh  / scaleHDPI;
 
         // Only scale the bitmap at the rendering stage,
         // so we don't lose quality twice
@@ -2198,7 +2200,7 @@ void MunkHtmlImageCell::SetImage(const wxImage& img)
         }
         else
 */
-            m_bitmap = new wxBitmap(img);
+	m_bitmap = new wxBitmap(img, -1, scaleHDPI);
     }
 #endif
 }
@@ -2228,17 +2230,38 @@ void MunkHtmlImageCell::Draw(wxDC& dc, int x, int y,
         // and height, so we only do the scaling once.
         double imageScaleX = 1.0;
         double imageScaleY = 1.0;
-        if (m_bmpW != m_bitmap->GetWidth())
-            imageScaleX = (double) m_bmpW / (double) m_bitmap->GetWidth();
-        if (m_bmpH != m_bitmap->GetHeight())
-            imageScaleY = (double) m_bmpH / (double) m_bitmap->GetHeight();
+
+        // Optimisation for Windows: WIN32 scaling for window DCs is very poor,
+        // so unless we're using a printer DC, do the scaling ourselves.
+#if defined(__WXMSW__) && wxUSE_IMAGE
+        if (m_Width >= 0 && m_Width != m_bitmap->GetWidth()
+    #if wxUSE_PRINTING_ARCHITECTURE
+            && !dc.IsKindOf(CLASSINFO(wxPrinterDC))
+    #endif
+           )
+        {
+            wxImage image(m_bitmap->ConvertToImage());
+            if (image.HasMask())
+            {
+                // Convert the mask to an alpha channel or scaling won't work correctly
+                image.InitAlpha();
+            }
+            image.Rescale(m_Width, m_Height, wxIMAGE_QUALITY_HIGH);
+            (*m_bitmap) = wxBitmap(image);
+        }
+#endif 
+
+        if (m_Width != m_bitmap->GetScaledWidth())
+            imageScaleX = (double) m_Width / (double) m_bitmap->GetScaledWidth();
+        if (m_Height != m_bitmap->GetScaledHeight())
+            imageScaleY = (double) m_Height / (double) m_bitmap->GetScaledHeight();
 
         double us_x, us_y;
         dc.GetUserScale(&us_x, &us_y);
-        dc.SetUserScale(us_x * m_scale * imageScaleX, us_y * m_scale * imageScaleY);
+        dc.SetUserScale(us_x * imageScaleX, us_y * imageScaleY);
 
-        dc.DrawBitmap(*m_bitmap, (int) ((x + m_PosX) / (m_scale*imageScaleX)),
-                                 (int) ((y + m_PosY) / (m_scale*imageScaleY)), true);
+        dc.DrawBitmap(*m_bitmap, (int) ((x + m_PosX) / (imageScaleX)),
+                                 (int) ((y + m_PosY) / (imageScaleY)), true);
         dc.SetUserScale(us_x, us_y);
     }
 }
@@ -2840,8 +2863,8 @@ static void SwitchSelState(wxDC& dc, MunkHtmlRenderingInfo& info,
 
 
 void MunkHtmlWordCell::Draw(wxDC& dc, int x, int y,
-                          int WXUNUSED(view_y1), int WXUNUSED(view_y2),
-                          MunkHtmlRenderingInfo& info)
+			    int WXUNUSED(view_y1), int WXUNUSED(view_y2),
+			    MunkHtmlRenderingInfo& info)
 {
 	if (!m_bIsVisible) 
 		return;
@@ -5005,6 +5028,10 @@ const MunkHtmlCell* MunkHtmlCellsIterator::operator++()
     #include "wx/timer.h"
     #include "wx/settings.h"
     #include "wx/dataobj.h"
+#if wxCHECK_VERSION(3,0,0)
+    #include "wx/dcgraph.h"
+#endif
+
 #endif
 
 #include "wx/clipbrd.h"
@@ -5398,7 +5425,13 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 	m_tmpSelFromCell = NULL;
 
 	// ...and run the parser on it:
+#if wxCHECK_VERSION(3,0,0)
+	wxGCDC *dc = new wxGCDC(this);
+	std::cerr << "UP360: wxGCDC" << std::endl;
+#else
 	wxClientDC *dc = new wxClientDC(this);
+	std::cerr << "UP360: wxClientDC" << std::endl;
+#endif
 	dc->SetMapMode(wxMM_TEXT);
 	//SetBackgroundColour(wxColour(0xFF, 0xFF, 0xFF));
 	SetHTMLBackgroundColour(wxNullColour);
@@ -5418,7 +5451,7 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 	MunkHtmlParsingStructure ps(this);
 
 	double pixel_scale = 1.0;
-#if wxCHECK_VERSION(3,1,0)
+#if wxCHECK_VERSION(3,0,0)
 	pixel_scale = this->GetContentScaleFactor();
 #else
 	pixel_scale = 1.0;
@@ -6063,11 +6096,15 @@ void MunkHtmlWindow::OnPaint(wxPaintEvent& WXUNUSED(event))
     wxSize sz = GetSize();
     wxRect rect = wxRect(0,0, sz.x, sz.y);
 
-    wxMemoryDC dcm;
+    /*
+    wxMemoryDC dcmreal;
     if ( !m_backBuffer )
         m_backBuffer = new wxBitmap(sz.x, sz.y);
-    dcm.SelectObject(*m_backBuffer);
+    dcmreal.SelectObject(*m_backBuffer);
 
+    wxGCDC dcm(dcmreal);
+    */
+    wxGCDC dcm(dc);
     PrepareDC(dcm);
     PaintBackground(dcm);
 
@@ -6111,7 +6148,7 @@ void MunkHtmlWindow::OnPaint(wxPaintEvent& WXUNUSED(event))
                           after->GetWidth()-4,after->GetHeight()-4);
     }
 #endif
-
+    /*
     dcm.SetDeviceOrigin(0,0);
     dc.SetDeviceOrigin(0,0);
     dc.DestroyClippingRegion();
@@ -6119,6 +6156,7 @@ void MunkHtmlWindow::OnPaint(wxPaintEvent& WXUNUSED(event))
             sz.x, rect.GetBottom() - rect.GetTop() + 1,
             &dcm,
             0, rect.GetTop());
+    */
 }
 
 
@@ -7440,7 +7478,7 @@ MunkQDHTMLHandler::MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMag
 	m_CurrentFontSpaceDescent = 0;
 	m_cur_form_id = 0;
 	m_pCanvas = pCanvas;
-	m_pDC = m_pCanvas->GetDC(); // new wxClientDC(pCanvas);
+	m_pDC = m_pCanvas->GetDC();
 	m_Align = MunkHTML_ALIGN_LEFT;
 	m_tmpStrBuf = NULL;
 	m_tmpStrBufSize = 0;
@@ -8067,7 +8105,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			int percent;
 			if (munkTag.GetParamAsInt(wxT("PERCENT"), &percent)) {
 				MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
-				int nPixelSize = ((int)(((m_nMagnification * DEFAULT_FONT_SIZE * current_font_attributes.m_sizeFactor * percent)) * m_pCanvas->GetPixelScale())) / 1000000;
+				int nPixelSize = ((int)(((m_nMagnification * DEFAULT_FONT_SIZE * current_font_attributes.m_sizeFactor * percent)))) / 1000000;
 				pixels = nPixelSize;
 			} else {
 				pixels = 0;
@@ -8160,10 +8198,18 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 					mn = mn.Mid( 1 );
 				}
 			}
+			// Change this to 2.0 if we ever get a str
+			// with @2x size. This is NOT the same scale
+			// as m_pCanvas->GetPixelScale(); that is also
+			// applied.
+			double scaleHDPI = 1.0;
+
 			MunkHtmlImageCell *cel = new MunkHtmlImageCell(
                                           GetWindowInterface(),
-                                          str, w, h,
-					  1.0, // Pixel scale
+                                          str, 
+					  scaleHDPI,
+					  w, h,
+					  m_pCanvas->GetPixelScale(), // Pixel scale
                                           al, mn);
 			ApplyStateToCell(cel);
 			if (munkTag.HasParam(wxT("DESCENT"))) {
@@ -9738,7 +9784,7 @@ wxFont *MunkQDHTMLHandler::getFontFromMunkHTMLFontAttributes(const MunkHTMLFontA
 	}
 
 	if (pResult == 0) {
-		int nPointSize = ((int)(((m_nMagnification * DEFAULT_FONT_SIZE * font_attributes.m_sizeFactor)) * m_pCanvas->GetPixelScale())) / 10000;
+		int nPointSize = ((int)(((m_nMagnification * DEFAULT_FONT_SIZE * font_attributes.m_sizeFactor)))) / 10000;
 		/*
 		int nFontStyle = (font_attributes.m_bItalic) ? wxFONTSTYLE_ITALIC : wxFONTSTYLE_NORMAL;
 
@@ -9753,6 +9799,9 @@ wxFont *MunkQDHTMLHandler::getFontFromMunkHTMLFontAttributes(const MunkHTMLFontA
 					      wxFONTENCODING_DEFAULT);
 		*/
 
+		wxFontInfo fontInfo(nPointSize);
+
+		/*
 		int nFontFlags = 0;
 		if (font_attributes.m_bItalic) {
 
@@ -9768,10 +9817,22 @@ wxFont *MunkQDHTMLHandler::getFontFromMunkHTMLFontAttributes(const MunkHTMLFontA
 					       nFontFlags,
 					       font_attributes.m_face,
 					       wxFONTENCODING_DEFAULT);
+		*/
+		if (font_attributes.m_bItalic) {
+			fontInfo.Italic(true);
+		}
+		if (font_attributes.m_bBold) {
+			fontInfo.Bold(true);
+		}
+		fontInfo.FaceName(font_attributes.m_face);
+
+		wxFont *pNewFont = new wxFont(fontInfo);
+
 
 		if (bUseCacheMap) {
 			m_HTML_font_map.insert(std::make_pair(characteristic_string, pNewFont));
 		}
+
 		pResult = pNewFont;
 	}
 
