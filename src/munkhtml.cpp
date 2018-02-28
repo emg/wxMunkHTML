@@ -4156,17 +4156,12 @@ void MunkHtmlContainerCell::SetWidthFloat(const MunkHtmlTag& tag, double pixel_s
 
 	if (bUseIt) {
 		if (isPercent) {
-			std::cerr << "UP356: bUseIt = true for GetParamAsIntOrPercent. isPercent = " << isPercent << ", wdi = " << wdi << std::endl;
 			SetWidthFloat(wdi, MunkHTML_UNITS_PERCENT);
 		} else {
-			std::cerr << "UP357: bUseIt = true for GetParamAsIntOrPercent. isPercent = " << isPercent << ", wdi = " << wdi << ", pixel_scale = " << pixel_scale << std::endl;
 			SetWidthFloat((int)(pixel_scale * (double)wdi), MunkHTML_UNITS_PIXELS);
 			
 		}
-	} else {
-		//std::cerr << "UP350: bUseIt = false for GetParamAsIntOrPercent. isPercent = " << isPercent << ", wdi = " << wdi << std::endl;
-		//SetWidthFloat(100, MunkHTML_UNITS_PERCENT);
-	}
+	} 
         m_LastLayout = -1;
     }
 }
@@ -4179,7 +4174,7 @@ void MunkHtmlContainerCell::SetHeight(const MunkHtmlTag& tag, double pixel_scale
         int wdi = 0;
 
 	bool bUseIt = tag.GetParamAsInt(wxT("HEIGHT"), &wdi);
-	std::cerr << "UP359: Set HEIGHT. bUseIt = " << bUseIt << ", wdi = " << wdi << ", pixel_scale = " << pixel_scale << "\n";
+
 	if (bUseIt) {
 		SetDeclaredHeight(((int)(pixel_scale * (double)wdi)));
 	} 
@@ -6890,18 +6885,12 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
 			    // Instead, we let it know that it is 100%
 			    // of the width of whatever the table
 			    // calculates it should be.
-			    std::cerr << "UP353: bUseIt = true for GetParamAsIntOrPercent. isPercent = " << isPercent << ", wdi = " << wdi << ", m_PixelScale = " << m_PixelScale << std::endl;
 			    cell->SetWidthFloat(100, MunkHTML_UNITS_PERCENT);
 		    } else {
 			    m_ColsInfo[c].width = (int)(m_PixelScale * (double)wdi);
 			    m_ColsInfo[c].units = MunkHTML_UNITS_PIXELS;
 			    // This is necessary so as to let the cell
 			    // itself know, too, what its width is.
-			    std::cerr << "UP352: bUseIt = true for GetParamAsIntOrPercent. isPercent = " << isPercent << ", wdi = " << wdi << ", m_PixelScale = " << m_PixelScale << std::endl;
-			    
-			    //cell->SetWidthFloat(100, MunkHTML_UNITS_PERCENT);
-			    //cell->SetWidthFloat((int) (m_PixelScale * (double) wdi), MunkHTML_UNITS_PIXELS);
-			    
 			    cell->SetWidthFloat(m_ColsInfo[c].width, m_ColsInfo[c].units);
 		    }
 	    }
@@ -8269,20 +8258,16 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 					
 					if (!bUseIt) {
 						// Base case: 100% if we did not parse it correctly.
-						std::cerr << "UP361: table width = 100%\n";
 						pTable->SetWidthFloat(100, MunkHTML_UNITS_PERCENT);
 					} else if (isPercent) {
 						int width = wdi;
-						std::cerr << "UP362: table width = "<< width << " %\n";
 						pTable->SetWidthFloat(width, MunkHTML_UNITS_PERCENT);
 					} else {
 						int width = wdi;
-						std::cerr << "UP363: table width = " << width << "PX\n";
 						pTable->SetWidthFloat((int)(1.0 * width), MunkHTML_UNITS_PIXELS);
 					}
 				} else {
 					pTable->SetWidthFloat(0, MunkHTML_UNITS_PIXELS);
-					std::cerr << "UP364: table width = 0 PX\n";
 				}
 			}
 			//pTable->SetWidthFloat(munkTag, 1.0); // FIXME: What about printing?
