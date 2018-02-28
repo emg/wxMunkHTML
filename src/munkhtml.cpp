@@ -5425,10 +5425,8 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 	// ...and run the parser on it:
 #if wxCHECK_VERSION(3,0,0)
 	wxGCDC *dc = new wxGCDC(this);
-	std::cerr << "UP360: wxGCDC" << std::endl;
 #else
 	wxClientDC *dc = new wxClientDC(this);
-	std::cerr << "UP360: wxClientDC" << std::endl;
 #endif
 	dc->SetMapMode(wxMM_TEXT);
 	//SetBackgroundColour(wxColour(0xFF, 0xFF, 0xFF));
@@ -6081,7 +6079,11 @@ void MunkHtmlWindow::OnPaint(wxPaintEvent& WXUNUSED(event))
 	}
 	*/
 
+#ifdef __WXMSW__
+    wxAutoBufferedPaintDC dc(this);
+#else
     wxPaintDC dc(this);
+#endif
 
     if (m_tmpCanDrawLocks > 0 || m_Cell == NULL) {
         return;
