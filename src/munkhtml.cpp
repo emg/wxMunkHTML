@@ -2176,7 +2176,6 @@ void MunkHtmlImageCell::SetDescent(int descent)
 
 void MunkHtmlImageCell::SetImage(const wxImage& img, double scaleHDPI)
 {
-#if !defined(__WXMSW__) || wxUSE_WXDIB
     if ( img.Ok() )
     {
         delete m_bitmap;
@@ -2200,9 +2199,8 @@ void MunkHtmlImageCell::SetImage(const wxImage& img, double scaleHDPI)
         }
         else
 */
-	m_bitmap = new wxBitmap(img, -1, scaleHDPI);
+	m_bitmap = new wxBitmap(img);
     }
-#endif
 }
 
 
