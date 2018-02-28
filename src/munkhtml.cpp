@@ -67,7 +67,7 @@
  * - Hence, we need another method.  This seems cleanest.
  *
  */
-std::string getMunkAttribute(const MunkAttributeMap& attrs, const std::string& key) throw(MunkQDException)
+std::string getMunkAttribute(const MunkAttributeMap& attrs, const std::string& key)
 {
 	MunkAttributeMap::const_iterator ci = attrs.find(key);
 	if (ci == attrs.end()) {
@@ -570,7 +570,7 @@ std::string MunkQDParser::state2string(eMunkQDStates e)
 	
 
 
-void MunkQDParser::parse(MunkQDDocHandler *pDH, std::istream *pStream) throw(MunkQDException) 
+void MunkQDParser::parse(MunkQDDocHandler *pDH, std::istream *pStream) 
 {
 	bot = tok = ptr = cur = pos = lim = top = eof = 0;
 	m_pInStream = pStream;
@@ -871,14 +871,14 @@ void MunkQDParser::parse(MunkQDDocHandler *pDH, std::istream *pStream) throw(Mun
 	cleanUp();
 }
 	
-void MunkQDParser::except(const std::string& s) throw(MunkQDException)
+void MunkQDParser::except(const std::string& s)
 {
 	std::ostringstream ostr;
 	ostr << s << " near line " << m_line << ", column " << m_column << '!' << std::endl;
 	throw MunkQDException(ostr.str());
 }
 
-void MunkQDParser::handle_entity(eMunkQDStates state) throw(MunkQDException)
+void MunkQDParser::handle_entity(eMunkQDStates state)
 {
 	if (m_entity.length() > 0 && m_entity[0] == '#') {
 		long l = 0;
@@ -944,7 +944,7 @@ void MunkQDParser::handle_entity(eMunkQDStates state) throw(MunkQDException)
 }
 
 
-char MunkQDParser::getNextChar(void) throw(MunkQDException)
+char MunkQDParser::getNextChar(void)
 {
 	char c;
 	if ((lim - cur) < 1) fillBuffer();
@@ -7502,7 +7502,7 @@ eWhiteSpaceKind MunkQDHTMLHandler::GetWhiteSpace(const MunkHtmlTag& munkTag)
 	}
 }
 
-void MunkQDHTMLHandler::pushFontAttrs(const std::string& tag, const MunkAttributeMap& attrs) throw(MunkQDException)
+void MunkQDHTMLHandler::pushFontAttrs(const std::string& tag, const MunkAttributeMap& attrs)
 {
 	MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
 
@@ -7623,7 +7623,7 @@ void MunkQDHTMLHandler::pushFontAttrs(const std::string& tag, const MunkAttribut
 	GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));  
 }
 
-void MunkQDHTMLHandler::popFontAttrs(const std::string& tag) throw(MunkQDException)
+void MunkQDHTMLHandler::popFontAttrs(const std::string& tag)
 {
 	endTag();
 	GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
@@ -7631,7 +7631,7 @@ void MunkQDHTMLHandler::popFontAttrs(const std::string& tag) throw(MunkQDExcepti
 	GetContainer()->InsertCell(new MunkHtmlColourCell(GetContainer()->GetBackgroundColour(), MunkHTML_CLR_BACKGROUND));
 }
 
-void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttributeMap& attrs) throw(MunkQDException)
+void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttributeMap& attrs)
 {
 	handleChars();
 
@@ -8594,7 +8594,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 }
 
 
-void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException)
+void MunkQDHTMLHandler::endElement(const std::string& tag)
 {
 	handleChars();
 
@@ -8786,14 +8786,14 @@ void MunkQDHTMLHandler::endElement(const std::string& tag) throw(MunkQDException
 }
 
 
-void MunkQDHTMLHandler::startDocument(void) throw(MunkQDException)
+void MunkQDHTMLHandler::startDocument(void)
 {
 	m_chars = "";
 	m_bInBody = false;
 }
 
 
-void MunkQDHTMLHandler::endDocument(void) throw(MunkQDException)
+void MunkQDHTMLHandler::endDocument(void)
 {
 	MunkHtmlContainerCell *top;
 
@@ -9179,7 +9179,7 @@ void MunkQDHTMLHandler::handleChars(void)
 	*/
 }
 
-void MunkQDHTMLHandler::text(const std::string& str) throw(MunkQDException)
+void MunkQDHTMLHandler::text(const std::string& str)
 {
 	m_chars += str;
 }

@@ -81,7 +81,7 @@ public:
 typedef std::map<std::string, std::string> MunkAttributeMap;
 
 
-extern std::string getMunkAttribute(const MunkAttributeMap& attrs, const std::string& key) throw(MunkQDException);
+extern std::string getMunkAttribute(const MunkAttributeMap& attrs, const std::string& key);
 
 
 
@@ -89,12 +89,12 @@ class MunkQDDocHandler {
  public:
 	MunkQDDocHandler() {};
 	virtual ~MunkQDDocHandler() {};
-	virtual void startElement(const std::string& tag, const MunkAttributeMap& attrs) throw(MunkQDException) {};
-	virtual void endElement(const std::string& tag) throw(MunkQDException) {};
-	virtual void startDocument(void) throw(MunkQDException) {};
-	virtual void endDocument(void) throw(MunkQDException) {};
-	virtual void text(const std::string& str) throw(MunkQDException) {};
-	virtual void comment(const std::string& str) throw(MunkQDException) {};
+	virtual void startElement(const std::string& tag, const MunkAttributeMap& attrs) {};
+	virtual void endElement(const std::string& tag) {};
+	virtual void startDocument(void) {};
+	virtual void endDocument(void) {};
+	virtual void text(const std::string& str) {};
+	virtual void comment(const std::string& str) {};
 };
 
 
@@ -165,7 +165,7 @@ class MunkQDParser {
  public:
 	MunkQDParser();
 	~MunkQDParser();
-	void parse(MunkQDDocHandler *pDH, std::istream *pStream) throw(MunkQDException);
+	void parse(MunkQDDocHandler *pDH, std::istream *pStream);
 
  protected:
 	void cleanUp() 
@@ -195,7 +195,7 @@ class MunkQDParser {
 	}
 		
 
-	eMunkQDStates popState(void) throw(MunkQDException)
+	eMunkQDStates popState(void)
 	{
 		if (!m_stack.empty()) {
 			eMunkQDStates result = m_stack.top();
@@ -207,13 +207,13 @@ class MunkQDParser {
 		}
 	}
 
-	void handle_entity(eMunkQDStates mode) throw(MunkQDException);
+	void handle_entity(eMunkQDStates mode);
 
 	std::string state2string(eMunkQDStates e);
 
-	void except(const std::string& s) throw(MunkQDException);
+	void except(const std::string& s);
 
-	char getNextChar(void) throw(MunkQDException);
+	char getNextChar(void);
 
 	void fillBuffer(void);
  protected:
@@ -2467,14 +2467,14 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
  public:
 	MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMagnification);
 	virtual ~MunkQDHTMLHandler();
-	virtual void startElement(const std::string& tag, const MunkAttributeMap& attrs) throw(MunkQDException);
-	virtual void endElement(const std::string& tag) throw(MunkQDException);
-	virtual void startDocument(void) throw(MunkQDException);
-	virtual void endDocument(void) throw(MunkQDException);
-	virtual void text(const std::string& str) throw(MunkQDException);
+	virtual void startElement(const std::string& tag, const MunkAttributeMap& attrs);
+	virtual void endElement(const std::string& tag);
+	virtual void startDocument(void);
+	virtual void endDocument(void);
+	virtual void text(const std::string& str);
  protected:
-	void pushFontAttrs(const std::string& tag, const MunkAttributeMap& attrs) throw(MunkQDException);
-	void popFontAttrs(const std::string& tag) throw(MunkQDException);
+	void pushFontAttrs(const std::string& tag, const MunkAttributeMap& attrs);
+	void popFontAttrs(const std::string& tag);
 	
 	MunkHtmlContainerCell *GetContainer() const { return m_pCurrentContainer; };
 	MunkHtmlContainerCell *OpenContainer();
