@@ -9349,6 +9349,7 @@ bool findBorder(const std::string& attrib_to_find,
 					if (str_unit == "px") {
 						part = number;
 						unit = MunkHTML_UNITS_PIXELS;
+						nPixels = (int) (((double) munk_string2long(part)) * pixel_scale);
 					} else if (str_unit == "in") {
 						part = number;
 						wxString doubleString = wxString(number.c_str(), wxConvUTF8);
