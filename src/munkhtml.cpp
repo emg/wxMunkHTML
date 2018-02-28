@@ -1841,7 +1841,7 @@ class MunkHtmlImageMapAreaCell : public MunkHtmlCell
         celltype type;
         int radius;
     public:
-        MunkHtmlImageMapAreaCell( celltype t, wxString &coords, double pixel_scale = 1.0);
+        MunkHtmlImageMapAreaCell( celltype t, wxString &coords, double pixel_scale);
         virtual MunkHtmlLinkInfo *GetLink( int x = 0, int y = 0 ) const;
         void Draw(wxDC& WXUNUSED(dc),
                   int WXUNUSED(x), int WXUNUSED(y),
@@ -2067,8 +2067,8 @@ class MunkHtmlImageCell : public MunkHtmlCell
 {
 public:
 	MunkHtmlImageCell(MunkHtmlWindowInterface *windowIface,
-			  wxFSFile *input, int w = wxDefaultCoord, int h = wxDefaultCoord,
-			  double scale = 1.0, int align = MunkHTML_ALIGN_BOTTOM,
+			  wxFSFile *input, int w, int h,
+			  double scale, int align = MunkHTML_ALIGN_BOTTOM,
 			  const wxString& mapname = wxEmptyString);
 	virtual ~MunkHtmlImageCell();
 	void Draw(wxDC& dc, int x, int y, int view_y1, int view_y2,
@@ -7734,8 +7734,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			GetContainer()->SetAlign(munkTag);
 		}
 		GetContainer()->SetVAlign(munkTag);
-		GetContainer()->SetWidthFloat(munkTag);
-		GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
+		GetContainer()->SetWidthFloat(munkTag, m_pCanvas->GetPixelScale());
+		GetContainer()->SetHeight(munkTag, m_pCanvas->GetPixelScale()); 
 		GetContainer()->SetDirection(munkTag);
 		
 		if (tag == "pre") {
@@ -8022,8 +8022,8 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		OpenContainer();
 
-		GetContainer()->SetWidthFloat(munkTag);
-		GetContainer()->SetHeight(munkTag, 1.0); // FIXME: What about printing?
+		GetContainer()->SetWidthFloat(munkTag, m_pCanvas->GetPixelScale());
+		GetContainer()->SetHeight(munkTag, m_pCanvas->GetPixelScale());
 		GetContainer()->SetAlign(munkTag);
 		GetContainer()->SetVAlign(munkTag);
 
@@ -8246,7 +8246,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 			m_table_cell_info_stack.push(std::make_pair(std::make_pair(oldAlign,bIsInline), oldcont));
 			
-			MunkHtmlTableCell *pTable = new MunkHtmlTableCell(c, munkTag);
+			MunkHtmlTableCell *pTable = new MunkHtmlTableCell(c, munkTag, m_pCanvas->GetPixelScale());
 			m_tables_stack.push(pTable);
 			
 			// width:
