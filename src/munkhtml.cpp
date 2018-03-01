@@ -5282,6 +5282,7 @@ void MunkHtmlWindow::CleanUpStatics()
 
 void MunkHtmlWindow::Init()
 {
+    m_bDoSetPageInWindowCreateEventHandle = false;
     m_nMagnification = 100;
     m_tmpCanDrawLocks = 0;
     m_FS = new wxFileSystem();
@@ -5319,15 +5320,8 @@ bool MunkHtmlWindow::Create(wxWindow *parent, wxWindowID id,
                                   name))
         return false;
 
-    // Don't do this here.  We may not have a fully constructed window
-    // at this point, especially if we are being constructed from the
-    // c'tor of some wxFrame-derived class.  In such a case, wxGCDC
-    // will assert false if we call DoSetPage through the Setpage call
-    // below.
-    /*
     std::string dummy_error_message;
     SetPage(wxT("<?xml version='1.0' encoding='utf-8'?><html><body></body></html>"), dummy_error_message);
-    */
     
     return true;
 }
@@ -5429,6 +5423,12 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 	// we will soon delete all the cells, so clear pointers to them:
 	m_tmpSelFromCell = NULL;
 
+	if (!m_bCreated) {
+		m_bDoSetPageInWindowCreateEventHandle = true;
+		error_message = "Window not yet created. Will call DoSetPage() when it has been created.";
+		return false;
+	} 
+	
 	// ...and run the parser on it:
 #if wxCHECK_VERSION(3,0,0)
 	wxGCDC *dc = new wxGCDC(this);
@@ -6413,6 +6413,18 @@ void MunkHtmlWindow::OnFormSubmitted(wxCommandEvent& event)
 	OnFormSubmitClicked(form_id, strFormName);
 }
 
+void MunkHtmlWindow::OnWindowCreate(wxWindowCreateEvent& event)
+{
+	// Now the window has been fully created
+	m_bCreated = true;
+	event.Skip();
+
+	if (m_bDoSetPageInWindowCreateEventHandle) {
+		m_bDoSetPageInWindowCreateEventHandle = false;
+		std::string error_message;
+		DoSetPage(m_strPageSource, error_message);
+	}
+}
 
 
 #if wxUSE_CLIPBOARD
@@ -6638,6 +6650,8 @@ BEGIN_EVENT_TABLE(MunkHtmlWindow, wxScrolledWindow)
     EVT_MOTION(MunkHtmlWindow::OnMouseMove)
     EVT_ERASE_BACKGROUND(MunkHtmlWindow::OnEraseBackground)
     EVT_PAINT(MunkHtmlWindow::OnPaint)
+    EVT_WINDOW_CREATE(MunkHtmlWindow::OnWindowCreate)    
+
 #if wxUSE_CLIPBOARD
     EVT_LEFT_DCLICK(MunkHtmlWindow::OnDoubleClick)
     EVT_ENTER_WINDOW(MunkHtmlWindow::OnMouseEnter)

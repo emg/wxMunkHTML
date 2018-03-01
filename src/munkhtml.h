@@ -1792,7 +1792,10 @@ class MunkHtmlWindow : public wxScrolledWindow,
     friend class MunkHtmlWinModule;
 
 public:
-    MunkHtmlWindow() : MunkHtmlWindowMouseHelper(this) { Init(); }
+    MunkHtmlWindow() : MunkHtmlWindowMouseHelper(this) {
+	    m_bCreated = false;
+	    Init();
+    }
     MunkHtmlWindow(wxWindow *parent, wxWindowID id = wxID_ANY,
 		   const wxPoint& pos = wxDefaultPosition,
 		   const wxSize& size = wxDefaultSize,
@@ -1800,8 +1803,9 @@ public:
 		   const wxString& name = wxT("htmlWindow"))
         : MunkHtmlWindowMouseHelper(this)
     {
-        Init();
-        Create(parent, id, pos, size, style, name);
+	    m_bCreated = false; 
+	    Init();
+	    Create(parent, id, pos, size, style, name);
     }
     virtual ~MunkHtmlWindow();
 
@@ -1948,6 +1952,11 @@ protected:
     void OnMouseDown(wxMouseEvent& event);
     void OnMouseUp(wxMouseEvent& event);
     void OnFormSubmitted(wxCommandEvent& event);
+    void OnWindowCreate(wxWindowCreateEvent& event);
+ protected:
+    bool m_bCreated; // Tells us whether we have been created
+    bool m_bDoSetPageInWindowCreateEventHandle; // Should we call DoSetPage from the OnWindowCreate() event handler?
+ public:
 #if wxUSE_CLIPBOARD
     void OnKeyUp(wxKeyEvent& event);
     void OnDoubleClick(wxMouseEvent& event);
