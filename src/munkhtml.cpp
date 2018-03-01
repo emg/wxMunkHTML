@@ -5311,16 +5311,23 @@ void MunkHtmlWindow::Init()
 }
 
 bool MunkHtmlWindow::Create(wxWindow *parent, wxWindowID id,
-                          const wxPoint& pos, const wxSize& size,
-                          long style, const wxString& name)
+			    const wxPoint& pos, const wxSize& size,
+			    long style, const wxString& name)
 {
     if (!wxScrolledWindow::Create(parent, id, pos, size,
                                   style | wxVSCROLL | wxHSCROLL,
                                   name))
         return false;
 
+    // Don't do this here.  We may not have a fully constructed window
+    // at this point, especially if we are being constructed from the
+    // c'tor of some wxFrame-derived class.  In such a case, wxGCDC
+    // will assert false if we call DoSetPage through the Setpage call
+    // below.
+    /*
     std::string dummy_error_message;
     SetPage(wxT("<?xml version='1.0' encoding='utf-8'?><html><body></body></html>"), dummy_error_message);
+    */
     
     return true;
 }
