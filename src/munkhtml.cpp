@@ -4080,10 +4080,11 @@ void MunkHtmlContainerCell::DrawInvisible(wxDC& dc, int x, int y,
 
 wxColour MunkHtmlContainerCell::GetBackgroundColour()
 {
-    if (m_UseBkColour)
-        return m_BkColour;
-    else
-        return wxNullColour;
+	if (m_UseBkColour) {
+		return m_BkColour;
+	} else {
+		return wxNullColour;
+	}
 }
 
 
@@ -5436,7 +5437,6 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 	wxClientDC *dc = new wxClientDC(this);
 #endif
 	dc->SetMapMode(wxMM_TEXT);
-	//SetBackgroundColour(wxColour(0xFF, 0xFF, 0xFF));
 	SetHTMLBackgroundColour(wxNullColour);
 	SetHTMLBackgroundImage(wxNullBitmap, MunkHTML_BACKGROUND_REPEAT_REPEAT);
 
@@ -6703,7 +6703,9 @@ wxColour MunkHtmlWindow::GetHTMLBackgroundColour() const
 void MunkHtmlWindow::SetHTMLBackgroundColour(const wxColour& clr)
 {
 	m_HTML_background_colour = clr;
-	SetBackgroundColour(clr);
+	if (clr != wxNullColour) {
+		SetBackgroundColour(clr);
+	}
 }
 
 void MunkHtmlWindow::SetHTMLBackgroundImage(const wxBitmap& bmpBg, int background_repeat)
@@ -8677,6 +8679,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			m_pCanvas->GetParentMunkHtmlWindow()->SetHTMLBackgroundColour(bgcolour);
 		}
 		OpenContainer();
+		m_pCurrentContainer->SetBackgroundColour(m_pCanvas->GetHTMLBackgroundColour());
 	} else {
 		throw MunkQDException(std::string("Unknown start-tag: <") + tag + ">");
 	}
