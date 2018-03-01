@@ -1295,7 +1295,7 @@ public:
     // it's width according to parent container's width
     // (w is percent of parent's width)
     MunkHtmlWidgetCell(wxWindow *wnd, int w = 0);
-    virtual ~MunkHtmlWidgetCell() { m_Wnd->Destroy(); }
+    virtual ~MunkHtmlWidgetCell() { m_Wnd->Destroy(); };
     virtual void Draw(wxDC& dc, int x, int y, int view_y1, int view_y2,
                       MunkHtmlRenderingInfo& info);
     virtual void DrawInvisible(wxDC& dc, int x, int y,
@@ -2357,7 +2357,8 @@ class MunkHtmlParsingStructure {
 	virtual void SetHTMLBackgroundColour(const wxColour& bgcol);
 	virtual wxColour GetHTMLBackgroundColour() const;
 
-	double GetPixelScale(void) const { return 1.0; /* return m_dblPixel_scale; */ };
+	double GetImagePixelScale(void) const { return m_dblPixel_scale; };
+	double GetPixelScale(void) const { return 1.0; };
 
 	// Returns pointer to conteiners/cells structure.
 	// It should be used ONLY when printing

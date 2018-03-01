@@ -8196,12 +8196,9 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			int w = wxDefaultCoord, h = wxDefaultCoord;
 			int al;
 			MunkHtmlTag munkTag(wxString(tag.c_str(), wxConvUTF8), attrs);
-			wxFSFile *str;
-			wxString tmp(getMunkAttribute(attrs, "src").c_str(), wxConvUTF8);
+			wxString srcURL(getMunkAttribute(attrs, "src").c_str(), wxConvUTF8);
 			wxString mn = wxEmptyString;
-
-			str = m_pCanvas->GetFS()->OpenFile(tmp, wxFS_SEEKABLE|wxFS_READ);
-
+			
 			if (munkTag.HasParam(wxT("WIDTH")))
 				munkTag.GetParamAsInt(wxT("WIDTH"), &w);
 			if (munkTag.HasParam(wxT("HEIGHT")))
@@ -8226,7 +8223,23 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			// as m_pCanvas->GetPixelScale(); that is also
 			// applied.
 			double scaleHDPI = 1.0;
+			wxFSFile *str;
+			if (m_pCanvas->GetImagePixelScale() >= 2.0) {
+				wxString srcAt2XURL = srcURL + wxT("@2x");
+				str = m_pCanvas->GetFS()->OpenFile(srcAt2XURL, wxFS_SEEKABLE|wxFS_READ);
+				if (str == NULL) {
+					// Try again with the original srcURL.
+					str = m_pCanvas->GetFS()->OpenFile(srcURL, wxFS_SEEKABLE|wxFS_READ);
+					scaleHDPI = 1.0;
+				} else {
+					scaleHDPI = m_pCanvas->GetImagePixelScale();
+				}
+			} else {
+				str = m_pCanvas->GetFS()->OpenFile(srcURL, wxFS_SEEKABLE|wxFS_READ);
+				scaleHDPI = 1.0;
+			}
 
+			
 			MunkHtmlImageCell *cel = new MunkHtmlImageCell(
                                           GetWindowInterface(),
                                           str, 
