@@ -6111,7 +6111,18 @@ void MunkHtmlWindow::OnPaint(wxPaintEvent& WXUNUSED(event))
 
     wxGCDC dcm(dcmreal);
     */
+
+#ifdef __WXMSW__
+    // __WXMWS__ doesn't like wxAutoBufferedePaintDC being
+    // encapsulated in a wxGCDC.  Doing so would not enable us to
+    // change the font away from Noto Sans, even for Greek and Hebrew.
+    //
+    // ... so we just make dcm an alias of (reference to) dc.
+    // 
+    wxAutoBufferedPaintDC& dcm = dc;
+#else
     wxGCDC dcm(dc);
+#endif
     PrepareDC(dcm);
     PaintBackground(dcm);
 
