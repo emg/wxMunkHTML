@@ -5432,7 +5432,15 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 	
 	// ...and run the parser on it:
 #if wxCHECK_VERSION(3,0,0)
+#if __WXMSW__
+	// Windows doesn't like to change font face when we use a
+	// wxGCDC...
+	wxClientDC *dc = new wxClientDC(this);
+#else
 	wxGCDC *dc = new wxGCDC(this);
+#endif
+
+	// wxWidgets version < 3.0.0
 #else
 	wxClientDC *dc = new wxClientDC(this);
 #endif
