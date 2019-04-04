@@ -7142,7 +7142,7 @@ void MunkHtmlTableCell::Layout(int w)
 
     /*
 
-    LAYOUTING :
+    LAYOUT :
 
     */
 
@@ -7151,7 +7151,7 @@ void MunkHtmlTableCell::Layout(int w)
            The algorithm tries to keep the table size less than w if possible.
        */
     {
-        int wpix = m_Width - (m_NumCols + 1) * m_Spacing;
+        int wpix = m_Width - (m_NumCols + 1) * m_Spacing - m_BorderWidthRight - m_BorderWidthLeft;  // Available space for cell content
         int i, j;
 
         // 1a. setup fixed-width columns:
@@ -7190,7 +7190,7 @@ void MunkHtmlTableCell::Layout(int w)
             else
                 newWidth = newWidth * 100 / (100 - percentage);
 
-            newWidth = wxMin(newWidth, w - (m_NumCols + 1) * m_Spacing);
+            newWidth = wxMin(newWidth, w - (m_NumCols + 1) * m_Spacing - m_BorderWidthRight - m_BorderWidthLeft);
             wpix -= m_Width - newWidth;
             m_Width = newWidth;
         }
@@ -7204,7 +7204,7 @@ void MunkHtmlTableCell::Layout(int w)
                 m_ColsInfo[i].pixwidth = wxMin(m_ColsInfo[i].width, 100) * wpix / 100;
 
                 // Make sure to leave enough space for the other columns
-                int minRequired = 0;
+                int minRequired = m_BorderWidthRight + m_BorderWidthLeft;
                 for (j = 0; j < m_NumCols; j++)
                 {
                     if ((m_ColsInfo[j].units == MunkHTML_UNITS_PERCENT && j > i) ||
@@ -7215,7 +7215,7 @@ void MunkHtmlTableCell::Layout(int w)
 
                 wtemp -= m_ColsInfo[i].pixwidth;
             }
-        wpix = wtemp;
+       wpix = wtemp; // minimum cells width
 
         // 1d. setup default columns (no width specification supplied):
         // The algorithm assigns calculates the maximum possible width if line
@@ -7226,8 +7226,8 @@ void MunkHtmlTableCell::Layout(int w)
 
         for (i = j = 0; i < m_NumCols; i++)
             if (m_ColsInfo[i].width == 0) j++;
-        if (wpix < 0)
-            wpix = 0;
+        if (wpix < (m_BorderWidthRight + m_BorderWidthLeft))
+  	    wpix = (m_BorderWidthRight + m_BorderWidthLeft);
 
         // Assign widths
         for (i = 0; i < m_NumCols; i++)
@@ -7265,7 +7265,7 @@ void MunkHtmlTableCell::Layout(int w)
 
     /* 2.  compute positions of columns: */
     {
-        int wpos = m_Spacing;
+        int wpos = m_Spacing + (m_BorderWidthRight + m_BorderWidthLeft);
         for (int i = 0; i < m_NumCols; i++)
         {
             m_ColsInfo[i].leftpos = wpos;
@@ -7273,8 +7273,8 @@ void MunkHtmlTableCell::Layout(int w)
         }
 
         // add the remaining space to the last column
-        if (m_NumCols > 0 && wpos < m_Width)
-            m_ColsInfo[m_NumCols-1].pixwidth += m_Width - wpos;
+        if (m_NumCols > 0 && wpos < m_Width - (m_BorderWidthRight + m_BorderWidthLeft))
+	    m_ColsInfo[m_NumCols-1].pixwidth += m_Width - wpos - (m_BorderWidthRight + m_BorderWidthLeft);
     }
 
     /* 3.  sub-layout all cells: */
@@ -7285,7 +7285,7 @@ void MunkHtmlTableCell::Layout(int w)
         int fullwid;
         MunkHtmlContainerCell *actcell;
 
-        ypos[0] = m_Spacing;
+        ypos[0] = m_Spacing + m_BorderWidthTop + m_BorderWidthBottom;
         for (actrow = 1; actrow <= m_NumRows; actrow++) ypos[actrow] = -1;
         for (actrow = 0; actrow < m_NumRows; actrow++)
         {
@@ -7327,22 +7327,18 @@ void MunkHtmlTableCell::Layout(int w)
                 actcell->SetPos(m_ColsInfo[actcol].leftpos, ypos[actrow]);
             }
         }
-
-
-        m_Height = ypos[m_NumRows];
+        m_Height = ypos[m_NumRows] + m_BorderWidthTop + m_BorderWidthBottom;
         delete[] ypos;
-
     }
 
     /* 4. adjust table's width if it was too small: */
     if (m_NumCols > 0)
     {
         int twidth = m_ColsInfo[m_NumCols-1].leftpos +
-                     m_ColsInfo[m_NumCols-1].pixwidth + m_Spacing;
+	m_ColsInfo[m_NumCols-1].pixwidth + m_Spacing + m_BorderWidthRight + m_BorderWidthLeft;
         if (twidth > m_Width)
             m_Width = twidth;
     }
-
 }
 
 

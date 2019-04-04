@@ -2240,7 +2240,7 @@ struct colStruct
             // ('width' is the number, 'units' determines its meaning)
     int minWidth, maxWidth;
             // minimal/maximal column width. This is needed by HTML 4.0
-            // layouting algorithm and can be determined by trying to
+            // layout algorithm and can be determined by trying to
             // layout table cells with width=1 and width=infinity
     int leftpos, pixwidth, maxrealwidth;
             // temporary (depends on actual width of table)
@@ -2270,9 +2270,10 @@ protected:
 
     // should we draw borders or not?
     bool m_HasBorders;
-    int m_nBorderWidth;
+    int m_nBorderWidth;	
+
     // number of columns; rows
-    int m_NumCols, m_NumRows;
+    int m_NumCols, m_NumRows, m_NumAllocatedRows;
     // array of column information
     colStruct *m_ColsInfo;
     // 2D array of all cells in the table : m_CellInfo[row][column]
@@ -2296,7 +2297,7 @@ private:
 
 
 public:
-    MunkHtmlTableCell(MunkHtmlContainerCell *parent, const MunkHtmlTag& tag, double pixel_scale);
+    MunkHtmlTableCell(MunkHtmlContainerCell *parent, const MunkHtmlTag& tag, double pixel_scale = 1.0);
     virtual ~MunkHtmlTableCell();
 
     virtual void RemoveExtraSpacing(bool top, bool bottom);
@@ -2305,6 +2306,8 @@ public:
 
     void AddRow(const MunkHtmlTag& tag);
     void AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& tag);
+
+    const wxColour& GetRowDefaultBackgroundColour() const { return m_rBkg; }
 
 private:
     // Reallocates memory to given number of cols/rows
@@ -2317,7 +2320,7 @@ private:
     // only once, before first Layout().
     void ComputeMinMaxWidths();
 
-    DECLARE_NO_COPY_CLASS(MunkHtmlTableCell)
+    wxDECLARE_NO_COPY_CLASS(MunkHtmlTableCell);
 };
 
 
