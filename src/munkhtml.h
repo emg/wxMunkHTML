@@ -377,7 +377,7 @@ public:
     bool GetParamAsInt(const wxString& par, int *clr) const;
     bool GetParamAsIntOrPercent(const wxString& par, int *clr, bool *isPercent) const;
     bool GetParamAsLengthInInches(const wxString& par, double *inches) const;
-    bool GetParamAsLength(const wxString& par, int *pixels, double inches_to_pixels_factor) const;
+    bool GetParamAsLength(const wxString& par, int *pixels, double inches_to_pixels_factor, int CurrentCharHeight) const;
 
 
     // Returns string containing all params.

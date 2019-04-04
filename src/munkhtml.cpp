@@ -1481,7 +1481,7 @@ bool MunkHtmlTag::GetParamAsLengthInInches(const wxString& par, double *inches) 
 	return succ;
 }
 
-bool MunkHtmlTag::GetParamAsLength(const wxString& par, int *pixels, double inches_to_pixels_factor) const
+bool MunkHtmlTag::GetParamAsLength(const wxString& par, int *pixels, double inches_to_pixels_factor, int CurrentCharHeight) const
 {
 	// We only do in, px, and no unit at the moment
 	// (no unit == pixels)
@@ -1500,6 +1500,17 @@ bool MunkHtmlTag::GetParamAsLength(const wxString& par, int *pixels, double inch
 		}
 		if (succ) {
 			*pixels = (int) (inches * inches_to_pixels_factor);
+		}
+	} else if (parStr.Right(2).Upper() == wxT("EM")) {
+		wxString doubleString = parStr.Left(parStr.Len() - 2);
+		double ems;
+		succ = doubleString.ToDouble(&ems);
+		if (!succ) {
+			doubleString.Replace(wxT("."), wxT(","), true);
+			succ = doubleString.ToDouble(&ems);
+		}
+		if (succ) {
+			*pixels = (int) (((double) CurrentCharHeight) * ems);
 		}
 	} else if (parStr.Right(2).Upper() == wxT("PX")) {
 		wxString doubleString = parStr.Left(parStr.Len() - 2);
@@ -3121,7 +3132,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 		int margin;
 		// Convert to pixels, based on 72 dpi
 		// FIXME: What about printing?
-		if (!munkTag.GetParamAsLength(wxT("MARGIN"), &margin, 72.0)) {
+		if (!munkTag.GetParamAsLength(wxT("MARGIN"), &margin, 72.0, CurrentCharHeight)) {
 			margin = 0;
 		}
 		
@@ -3135,7 +3146,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 
 			// Convert to pixels, based on 72 dpi
 			// FIXME: What about printing?
-			if (!munkTag.GetParamAsLength(wxT("MARGIN_TOP"), &marginTop, 72.0)) {
+			if (!munkTag.GetParamAsLength(wxT("MARGIN_TOP"), &marginTop, 72.0, CurrentCharHeight)) {
 				marginTop = 0;
 			}
 
@@ -3164,7 +3175,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 
 			// Convert to pixels, based on 72 dpi
 			// FIXME: What about printing?
-			if (!munkTag.GetParamAsLength(wxT("MARGIN_RIGHT"), &marginRight, 72.0)) {
+			if (!munkTag.GetParamAsLength(wxT("MARGIN_RIGHT"), &marginRight, 72.0, CurrentCharHeight)) {
 				marginRight = 0;
 			}
 			
@@ -3181,7 +3192,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 
 			// Convert to pixels, based on 72 dpi
 			// FIXME: What about printing?
-			if (!munkTag.GetParamAsLength(wxT("MARGIN_BOTTOM"), &marginBottom, 72.0)) {
+			if (!munkTag.GetParamAsLength(wxT("MARGIN_BOTTOM"), &marginBottom, 72.0, CurrentCharHeight)) {
 				marginBottom = 0;
 			}
 
@@ -3203,7 +3214,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 
 			// Convert to pixels, based on 72 dpi
 			// FIXME: What about printing?
-			if (!munkTag.GetParamAsLength(wxT("MARGIN_LEFT"), &marginLeft, 72.0)) {
+			if (!munkTag.GetParamAsLength(wxT("MARGIN_LEFT"), &marginLeft, 72.0, CurrentCharHeight)) {
 				marginLeft = 0;
 			}
 
@@ -3228,7 +3239,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 		int padding;
 		// Convert to pixels, based on 72 dpi
 		// FIXME: What about printing?
-		if (!munkTag.GetParamAsLength(wxT("PADDING"), &padding, 72.0)) {
+		if (!munkTag.GetParamAsLength(wxT("PADDING"), &padding, 72.0, CurrentCharHeight)) {
 			padding = 0;
 		}
 		
@@ -3242,7 +3253,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 
 			// Convert to pixels, based on 72 dpi
 			// FIXME: What about printing?
-			if (!munkTag.GetParamAsLength(wxT("PADDING_TOP"), &paddingTop, 72.0)) {
+			if (!munkTag.GetParamAsLength(wxT("PADDING_TOP"), &paddingTop, 72.0, CurrentCharHeight)) {
 				paddingTop = 0;
 			}
 
@@ -3260,7 +3271,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 
 			// Convert to pixels, based on 72 dpi
 			// FIXME: What about printing?
-			if (!munkTag.GetParamAsLength(wxT("PADDING_RIGHT"), &paddingRight, 72.0)) {
+			if (!munkTag.GetParamAsLength(wxT("PADDING_RIGHT"), &paddingRight, 72.0, CurrentCharHeight)) {
 				paddingRight = 0;
 			}
 			
@@ -3277,7 +3288,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 
 			// Convert to pixels, based on 72 dpi
 			// FIXME: What about printing?
-			if (!munkTag.GetParamAsLength(wxT("PADDING_BOTTOM"), &paddingBottom, 72.0)) {
+			if (!munkTag.GetParamAsLength(wxT("PADDING_BOTTOM"), &paddingBottom, 72.0, CurrentCharHeight)) {
 				paddingBottom = 0;
 			}
 
@@ -3294,7 +3305,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 
 			// Convert to pixels, based on 72 dpi
 			// FIXME: What about printing?
-			if (!munkTag.GetParamAsLength(wxT("PADDING_LEFT"), &paddingLeft, 72.0)) {
+			if (!munkTag.GetParamAsLength(wxT("PADDING_LEFT"), &paddingLeft, 72.0, CurrentCharHeight)) {
 				paddingLeft = 0;
 			}
 
@@ -3324,7 +3335,7 @@ void MunkHtmlContainerCell::SetMarginsAndPaddingAndTextIndent(const std::string&
 
 		// Convert to pixels, based on 72 dpi
 		// FIXME: What about printing?
-		if (!munkTag.GetParamAsLength(wxT("TEXT_INDENT"), &firstLineIndent, 72.0)) {
+		if (!munkTag.GetParamAsLength(wxT("TEXT_INDENT"), &firstLineIndent, 72.0, CurrentCharHeight)) {
 			firstLineIndent = 0;
 		}
 
@@ -8127,6 +8138,10 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		
 		AddHtmlTagCell(pMiniDOMTag);
 
+
+		SetAlign(GetContainer()->GetAlignHor());
+
+		
 		// OpenContainer();
 		// OpenContainer();
 	} else if (tag == "b") {
