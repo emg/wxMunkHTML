@@ -7811,6 +7811,9 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 		
 		//OpenContainer();
 		
+
+		GetContainer()->SetDirection(munkTag);
+		
 		
 		if (tag == "center") {
 			GetContainer()->SetAlignHor(MunkHTML_ALIGN_CENTER);
@@ -8106,6 +8109,9 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		OpenContainer();
 
+
+		GetContainer()->SetDirection(munkTag);
+		
 		GetContainer()->SetWidthFloat(munkTag, m_pCanvas->GetPixelScale());
 		GetContainer()->SetHeight(munkTag, m_pCanvas->GetPixelScale());
 		GetContainer()->SetAlign(munkTag);
@@ -8120,7 +8126,6 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 
 		
 		AddHtmlTagCell(pMiniDOMTag);
-
 
 		// OpenContainer();
 		// OpenContainer();
@@ -8740,9 +8745,12 @@ void MunkQDHTMLHandler::endElement(const std::string& tag)
 		
 		//CloseContainer();
 		CloseContainer();
+
 		//endTag(); // ends startColor() from the start tag
 		GetContainer()->InsertCell(new MunkHtmlColourCell(GetActualColor()));
 
+		
+		
 		AddHtmlTagCell(new MunkMiniDOMTag(tag, kEndTag));
 
 		if (tag == "pre") {	
