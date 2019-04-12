@@ -1047,13 +1047,126 @@ MunkHtmlParsingStructure::MunkHtmlParsingStructure(MunkHtmlWindow *pParent)
 	m_pFS = 0;
 	m_pDC = 0;
 	m_pForms = 0;
+	m_nMagnification = 100;
 }
 
 
 MunkHtmlParsingStructure::~MunkHtmlParsingStructure()
 {
+	clear();
+}
+
+void MunkHtmlParsingStructure::clear()
+{
 	delete m_Cell;
+	m_Cell = 0;
 	delete m_pForms;
+	m_pForms = 0;
+
+	// Clear the m_HTML_font_map
+	String2PFontMap::iterator it 
+		= m_HTML_font_map.begin();
+	while (it != m_HTML_font_map.end()) {
+		delete it->second;
+		++it;
+	}
+	m_HTML_font_map.clear();
+
+
+	// Clear the m_MunkStringMetricsCacheCache
+	clearMunkStringMetricsCacheCache();
+}
+
+void MunkHtmlParsingStructure::clearMunkStringMetricsCacheCache()
+{
+	CharacteristicString2MunkStringMetricsCacheMap::iterator it = m_MunkStringMetricsCacheCache.begin();
+	CharacteristicString2MunkStringMetricsCacheMap::iterator itend = m_MunkStringMetricsCacheCache.end();
+	while (it != itend) {
+		delete it->second;
+		++it;
+	}
+	m_MunkStringMetricsCacheCache.clear();
+}
+
+
+wxFont *MunkHtmlParsingStructure::getFontFromMunkHTMLFontAttributes(const MunkHTMLFontAttributes& font_attributes, bool bUseCacheMap, const std::string& characteristic_string)
+{
+	wxFont *pResult = 0;
+
+	if (bUseCacheMap) {
+		String2PFontMap::iterator it = m_HTML_font_map.find(characteristic_string);
+		if (it != m_HTML_font_map.end()) {
+			pResult = it->second;
+		}
+	}
+
+	if (pResult == 0) {
+		int nPointSize = ((int)(((m_nMagnification * DEFAULT_FONT_SIZE * font_attributes.m_sizeFactor)))) / 10000;
+		/*
+		int nFontStyle = (font_attributes.m_bItalic) ? wxFONTSTYLE_ITALIC : wxFONTSTYLE_NORMAL;
+
+		wxFontWeight fontWeight = (font_attributes.m_bBold) ? wxFONTWEIGHT_BOLD : wxFONTWEIGHT_NORMAL;
+		
+		wxFont *pNewFont = new wxFont(nPointSize,
+					      wxFONTFAMILY_ROMAN,
+					      nFontStyle,
+					      fontWeight,
+					      false,
+					      wxT("Arial"),
+					      wxFONTENCODING_DEFAULT);
+		*/
+
+		wxFontInfo fontInfo(nPointSize);
+
+		/*
+		int nFontFlags = 0;
+		if (font_attributes.m_bItalic) {
+
+			nFontFlags |= wxFONTFLAG_ITALIC;
+		}
+		if (font_attributes.m_bBold) {
+			nFontFlags |= wxFONTFLAG_BOLD;
+		}
+		nFontFlags |= wxFONTFLAG_ANTIALIASED;
+
+		wxFont *pNewFont = wxFont::New(nPointSize,
+					       wxFONTFAMILY_ROMAN,
+					       nFontFlags,
+					       font_attributes.m_face,
+					       wxFONTENCODING_DEFAULT);
+		*/
+		if (font_attributes.m_bItalic) {
+			fontInfo.Italic(true);
+		}
+		if (font_attributes.m_bBold) {
+			fontInfo.Bold(true);
+		}
+		fontInfo.FaceName(font_attributes.m_face);
+
+		wxFont *pNewFont = new wxFont(fontInfo);
+
+
+		if (bUseCacheMap) {
+			m_HTML_font_map.insert(std::make_pair(characteristic_string, pNewFont));
+		}
+
+		pResult = pNewFont;
+	}
+
+	return pResult;
+}
+
+
+MunkStringMetricsCache *MunkHtmlParsingStructure::getMunkStringMetricsCache(const std::string& font_characteristic_string)
+{
+	CharacteristicString2MunkStringMetricsCacheMap::iterator it = m_MunkStringMetricsCacheCache.find(font_characteristic_string);
+	if (it == m_MunkStringMetricsCacheCache.end()) {
+		MunkStringMetricsCache *pNewCache = new MunkStringMetricsCache();
+		m_MunkStringMetricsCacheCache.insert(std::make_pair(font_characteristic_string, pNewCache));
+		return pNewCache;
+	} else {
+		return it->second;
+	}
 }
 
 
@@ -1081,11 +1194,12 @@ bool MunkHtmlParsingStructure::Parse(const wxString& text, int nMagnification, s
 {
 	bool bResult = true;
 	error_message = "";
+	ChangeMagnification(nMagnification);
 	try {
 	    
 		std::istringstream istr(std::string((const char*)text.mb_str(wxConvUTF8)));
 
-		MunkQDHTMLHandler dh(this, nMagnification);
+		MunkQDHTMLHandler dh(this);
 	    
 		MunkQDParser parser;
 		parser.parse(&dh, &istr);
@@ -1099,6 +1213,38 @@ bool MunkHtmlParsingStructure::Parse(const wxString& text, int nMagnification, s
 	return bResult;
 }
 
+
+void MunkHtmlParsingStructure::ChangeMagnification(int nNewMagnification)
+{
+	if (m_nMagnification == nNewMagnification) {
+		// Nothing to do
+	} else {
+		m_nMagnification = nNewMagnification;
+		
+		m_FontSpaceCache.clear();
+
+		clearMunkStringMetricsCacheCache();
+		
+		// magnification is a percentage
+		//int pointSize = (int) ((DEFAULT_FONT_SIZE * magnification) / 100);
+		
+		// now round size to a multiple of 10
+		//pointSize = ((pointSize + 5) / 10) * 10;
+		
+		String2PFontMap::iterator it 
+			= m_HTML_font_map.begin();
+		while (it != m_HTML_font_map.end()) {
+			std::string characteristic_string = it->first;
+			MunkHTMLFontAttributes font_attr = MunkHTMLFontAttributes::fromString(characteristic_string);
+			wxFont *pNewFont = getFontFromMunkHTMLFontAttributes(font_attr,
+									     false, // Use cache? No: We are going to replace it...
+									     ""); 
+			delete it->second;
+			it->second = pNewFont;
+			++it;
+		}
+	}
+}
 
 
 
@@ -1312,6 +1458,60 @@ void MunkHTMLFontAttributes::copy_to_self(const MunkHTMLFontAttributes& other)
 
 
 
+//-----------------------------------------------------------------------------
+// MunkStringMetricsCache
+//-----------------------------------------------------------------------------
+
+MunkStringMetricsCache::MunkStringMetricsCache()
+{
+}
+
+MunkStringMetricsCache::~MunkStringMetricsCache()
+{
+}
+
+void MunkStringMetricsCache::GetTextExtent(const wxString& strInput, wxDC *pDC, wxCoord *pWidth, wxCoord *pHeight, wxCoord *pDescent)
+{
+	std::map<wxString, MunkFontStringMetrics>::iterator it = m_String2FontStringMetricsMap.find(strInput);
+	if (it == m_String2FontStringMetricsMap.end()) {
+		int Width;
+		int Height;
+		int Descent;
+
+		pDC->GetTextExtent(strInput, &Width, &Height, &Descent);
+
+		MunkFontStringMetrics fontStringMetrics(Width, Height, Descent);
+		wxString myString = strInput;
+
+		m_String2FontStringMetricsMap.insert(std::make_pair(myString, fontStringMetrics));
+	        
+		if (pWidth != NULL) {
+			*pWidth = Width;
+		}
+		
+		if (pHeight != NULL) {
+			*pHeight = Height;
+		}
+		
+		if (pDescent != NULL) {
+			*pDescent = Descent;
+		}
+		
+	} else {
+		if (pWidth != NULL) {
+			*pWidth = it->second.m_StringWidth;
+		}
+		
+		if (pHeight != NULL) {
+			*pHeight = it->second.m_StringHeight;
+		}
+		
+		if (pDescent != NULL) {
+			*pDescent = it->second.m_StringDescent;
+		}
+		
+	}
+}
 
 
 
@@ -2679,10 +2879,10 @@ bool MunkHtmlCell::IsBefore(MunkHtmlCell *cell) const
 
 IMPLEMENT_ABSTRACT_CLASS(MunkHtmlWordCell, MunkHtmlCell)
 
-MunkHtmlWordCell::MunkHtmlWordCell(const wxString& word, const wxDC& dc) : MunkHtmlCell()
+MunkHtmlWordCell::MunkHtmlWordCell(const wxString& word, MunkStringMetricsCache *pStringMetricsCache, wxDC *pDC) : MunkHtmlCell()
 {
     m_Word = word;
-    dc.GetTextExtent(m_Word, &m_Width, &m_Height, &m_Descent);
+    pStringMetricsCache->GetTextExtent(m_Word, pDC, &m_Width, &m_Height, &m_Descent);
     SetCanLiveOnPagebreak(false);
     m_allowLinebreak = true;
 }
@@ -4519,10 +4719,8 @@ void MunkHtmlContainerCell::RemoveExtraSpacing(bool top, bool bottom)
 
 IMPLEMENT_ABSTRACT_CLASS(MunkHtmlNegativeSpaceCell, MunkHtmlCell)
 
-MunkHtmlNegativeSpaceCell::MunkHtmlNegativeSpaceCell(int pixels, const wxDC& dc) : MunkHtmlWordCell(wxT(""), dc)
+MunkHtmlNegativeSpaceCell::MunkHtmlNegativeSpaceCell(int pixels, MunkStringMetricsCache *pStringMetricsCache, wxDC *pDC) : MunkHtmlWordCell(wxT(""), pStringMetricsCache, pDC)
 {
-	m_Word = wxT("");
-	dc.GetTextExtent(m_Word, &m_Width, &m_Height, &m_Descent);
 	SetCanLiveOnPagebreak(false);
 	m_allowLinebreak = false;
 	m_Width = -pixels;
@@ -5321,6 +5519,7 @@ void MunkHtmlWindow::Init()
     m_eraseBgInOnPaint = false;
     m_tmpSelFromCell = NULL;
     m_pForms = 0;
+    m_pParsingStructure = new MunkHtmlParsingStructure(this);
 }
 
 bool MunkHtmlWindow::Create(wxWindow *parent, wxWindowID id,
@@ -5351,6 +5550,7 @@ MunkHtmlWindow::~MunkHtmlWindow()
     delete m_Cell;
 
     //delete m_Parser;
+    delete m_pParsingStructure;
     delete m_FS;
     delete m_History;
     delete m_backBuffer;
@@ -5420,8 +5620,16 @@ void MunkHtmlWindow::SetForms(MunkHtmlFormContainer *pForms)
 
 bool MunkHtmlWindow::ChangeMagnification(int nNewMagnification, std::string& error_message)
 {
-	m_nMagnification = nNewMagnification;
-	return DoSetPage(m_strPageSource, error_message);
+	if (m_nMagnification == nNewMagnification) {
+		// Nothing to do
+		return true;
+	} else {
+		m_nMagnification = nNewMagnification;
+
+		m_pParsingStructure->ChangeMagnification(m_nMagnification);
+	
+		return DoSetPage(m_strPageSource, error_message);
+	}
 }
 
 bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_message)
@@ -5470,8 +5678,7 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 
 	bool bResult = true;
 	error_message = "";
-	MunkHtmlParsingStructure ps(this);
-
+ 
 	double pixel_scale = 1.0;
 #if wxCHECK_VERSION(3,0,0)
 	pixel_scale = this->GetContentScaleFactor();
@@ -5479,14 +5686,14 @@ bool MunkHtmlWindow::DoSetPage(const wxString& source, std::string& error_messag
 	pixel_scale = 1.0;
 #endif
 	
-	ps.SetDC(dc, pixel_scale);
-	ps.SetFS(GetFS());
-	ps.SetHTMLBackgroundColour(this->GetHTMLBackgroundColour());
+	m_pParsingStructure->SetDC(dc, pixel_scale);
+	m_pParsingStructure->SetFS(GetFS());
+	m_pParsingStructure->SetHTMLBackgroundColour(this->GetHTMLBackgroundColour());
 	try {
-		bResult = ps.Parse(m_strPageSource, m_nMagnification, error_message);
-		SetTopCell(ps.GetInternalRepresentation());
-		SetForms(ps.TakeOverForms());
-		ps.SetTopCell(0); // Make sure we don't delete the cells in the ps destructor
+		bResult = m_pParsingStructure->Parse(m_strPageSource, m_nMagnification, error_message);
+		SetTopCell(m_pParsingStructure->GetInternalRepresentation());
+		SetForms(m_pParsingStructure->TakeOverForms());
+		m_pParsingStructure->SetTopCell(0); // Make sure we don't delete the cells in the ps destructor
 		
 		Scroll(0,0);
 		
@@ -7471,7 +7678,7 @@ wxString MunkHtmlTagCell::toString() const
 //////////////////////////////////////////////////////////
 
 
-MunkFontStringMetrics::MunkFontStringMetrics(long StringWidth, long StringHeight, long StringDescent)
+MunkFontStringMetrics::MunkFontStringMetrics(int StringWidth, int StringHeight, int StringDescent)
 	: m_StringWidth(StringWidth),
 	  m_StringHeight(StringHeight),
 	  m_StringDescent(StringDescent)
@@ -7512,14 +7719,13 @@ wxRegEx MunkQDHTMLHandler::m_regex_linefeed(wxT("\x0a"));
 wxRegEx MunkQDHTMLHandler::m_regex_tab(wxT("\x09"));
 wxRegEx MunkQDHTMLHandler::m_regex_space_spaces(wxT("\x20[\x20]+"));
 
-MunkQDHTMLHandler::MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMagnification)
+MunkQDHTMLHandler::MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas)
 	: m_chars(""),
 	  m_bInBody(false),
 	  m_pCurrentContainer(0),
 	  m_CharHeight(0),
 	  m_CharWidth(0),
-	  m_UseLink(false),
-	  m_nMagnification(nMagnification)
+	  m_UseLink(false)
 {
 	m_CurrentFontCharacteristicString = "";
 	m_CurrentFontSpaceWidth = 0;
@@ -7570,13 +7776,6 @@ MunkQDHTMLHandler::MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMag
 
 MunkQDHTMLHandler::~MunkQDHTMLHandler()
 {
-	String2PFontMap::iterator it 
-		= m_HTML_font_map.begin();
-	while (it != m_HTML_font_map.end()) {
-		delete it->second;
-		++it;
-	}
-
 	delete[] m_tmpStrBuf;
 }
 
@@ -8163,7 +8362,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			int percent;
 			if (munkTag.GetParamAsInt(wxT("PERCENT"), &percent)) {
 				MunkHTMLFontAttributes current_font_attributes = m_HTML_font_attribute_stack.top();
-				int nPixelSize = ((int)(((m_nMagnification * DEFAULT_FONT_SIZE * current_font_attributes.m_sizeFactor * percent)))) / 1000000;
+				int nPixelSize = ((int)(((m_pCanvas->GetMagnification() * DEFAULT_FONT_SIZE * current_font_attributes.m_sizeFactor * percent)))) / 1000000;
 				pixels = nPixelSize;
 			} else {
 				pixels = 0;
@@ -8172,7 +8371,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 			pixels = 0;
 		}
 
-		GetContainer()->InsertCell(new MunkHtmlNegativeSpaceCell(pixels, *(m_pDC)));
+		GetContainer()->InsertCell(new MunkHtmlNegativeSpaceCell(pixels, m_pCanvas->getMunkStringMetricsCache(m_CurrentFontCharacteristicString), m_pDC));
 	} else if (tag == "i") {
 		startEm();
 		GetContainer()->InsertCell(new MunkHtmlFontCell(CreateCurrentFont(), GetFontUnderline()));
@@ -8526,7 +8725,7 @@ void MunkQDHTMLHandler::startElement(const std::string& tag, const MunkAttribute
 				c->SetAlignHor(MunkHTML_ALIGN_RIGHT);
 				wxString markStr;
 				markStr.Printf(wxT("%i. "), m_Numbering);
-				c->InsertCell(new MunkHtmlWordCell(markStr, *(m_pDC)));
+				c->InsertCell(new MunkHtmlWordCell(markStr, m_pCanvas->getMunkStringMetricsCache(m_CurrentFontCharacteristicString), m_pDC));
 			}
 			CloseContainer();
 
@@ -9172,7 +9371,7 @@ void MunkQDHTMLHandler::DoAddText(wxChar *temp, int& templen, wxChar nbsp)
             temp[j] = wxT(' ');
     }
 
-    MunkHtmlCell *c = new MunkHtmlWordCell(temp, *(m_pDC));
+    MunkHtmlCell *c = new MunkHtmlWordCell(temp, m_pCanvas->getMunkStringMetricsCache(m_CurrentFontCharacteristicString), m_pDC);
 
     ApplyStateToCell(c);
 
@@ -9191,7 +9390,7 @@ void MunkQDHTMLHandler::DoAddText(const wxString& txt)
 	if (mytxt == wxT(" ")) {
 		c = new MunkHtmlWordCell(m_CurrentFontSpaceWidth, m_CurrentFontSpaceHeight, m_CurrentFontSpaceDescent);
 	} else {
-		c = new MunkHtmlWordCell(mytxt, *(m_pDC));
+		c = new MunkHtmlWordCell(mytxt, m_pCanvas->getMunkStringMetricsCache(m_CurrentFontCharacteristicString), m_pDC);
 	}
 
 	if (!mytxt.IsEmpty() && mytxt.Right(1) == wxT(' ')) {
@@ -9848,72 +10047,6 @@ MunkHTMLFontAttributes MunkQDHTMLHandler::topFontAttributeStack(void)
 }
 
 
-wxFont *MunkQDHTMLHandler::getFontFromMunkHTMLFontAttributes(const MunkHTMLFontAttributes& font_attributes, bool bUseCacheMap, const std::string& characteristic_string)
-{
-	wxFont *pResult = 0;
-
-	if (bUseCacheMap) {
-		String2PFontMap::iterator it = m_HTML_font_map.find(characteristic_string);
-		if (it != m_HTML_font_map.end()) {
-			pResult = it->second;
-		}
-	}
-
-	if (pResult == 0) {
-		int nPointSize = ((int)(((m_nMagnification * DEFAULT_FONT_SIZE * font_attributes.m_sizeFactor)))) / 10000;
-		/*
-		int nFontStyle = (font_attributes.m_bItalic) ? wxFONTSTYLE_ITALIC : wxFONTSTYLE_NORMAL;
-
-		wxFontWeight fontWeight = (font_attributes.m_bBold) ? wxFONTWEIGHT_BOLD : wxFONTWEIGHT_NORMAL;
-		
-		wxFont *pNewFont = new wxFont(nPointSize,
-					      wxFONTFAMILY_ROMAN,
-					      nFontStyle,
-					      fontWeight,
-					      false,
-					      wxT("Arial"),
-					      wxFONTENCODING_DEFAULT);
-		*/
-
-		wxFontInfo fontInfo(nPointSize);
-
-		/*
-		int nFontFlags = 0;
-		if (font_attributes.m_bItalic) {
-
-			nFontFlags |= wxFONTFLAG_ITALIC;
-		}
-		if (font_attributes.m_bBold) {
-			nFontFlags |= wxFONTFLAG_BOLD;
-		}
-		nFontFlags |= wxFONTFLAG_ANTIALIASED;
-
-		wxFont *pNewFont = wxFont::New(nPointSize,
-					       wxFONTFAMILY_ROMAN,
-					       nFontFlags,
-					       font_attributes.m_face,
-					       wxFONTENCODING_DEFAULT);
-		*/
-		if (font_attributes.m_bItalic) {
-			fontInfo.Italic(true);
-		}
-		if (font_attributes.m_bBold) {
-			fontInfo.Bold(true);
-		}
-		fontInfo.FaceName(font_attributes.m_face);
-
-		wxFont *pNewFont = new wxFont(fontInfo);
-
-
-		if (bUseCacheMap) {
-			m_HTML_font_map.insert(std::make_pair(characteristic_string, pNewFont));
-		}
-
-		pResult = pNewFont;
-	}
-
-	return pResult;
-}
 
 
 MunkHtmlScriptMode MunkQDHTMLHandler::GetScriptMode() const
@@ -9932,38 +10065,15 @@ bool MunkQDHTMLHandler::GetFontSmallCaps() const
 }
 
 
-void MunkQDHTMLHandler::ChangeMagnification(int magnification)
-{
-	m_nMagnification = magnification;
-
-	// magnification is a percentage
-	//int pointSize = (int) ((DEFAULT_FONT_SIZE * magnification) / 100);
-
-	// now round size to a multiple of 10
-	//pointSize = ((pointSize + 5) / 10) * 10;
-	
-	String2PFontMap::iterator it 
-		= m_HTML_font_map.begin();
-	while (it != m_HTML_font_map.end()) {
-		std::string characteristic_string = it->first;
-		MunkHTMLFontAttributes font_attr = MunkHTMLFontAttributes::fromString(characteristic_string);
-		wxFont *pNewFont = this->getFontFromMunkHTMLFontAttributes(font_attr,
-									   false, // Use cache? No: We are going to replace it...
-									   ""); 
-		delete it->second;
-		it->second = pNewFont;
-		++it;
-	}
-}
 
 wxFont *MunkQDHTMLHandler::CreateCurrentFont()
 {
 	const MunkHTMLFontAttributes& font_attributes = m_HTML_font_attribute_stack.top();
 	std::string characteristic_string = font_attributes.toString();
 
-	wxFont *pResult = getFontFromMunkHTMLFontAttributes(font_attributes,
-							    true, // Use map
-							    characteristic_string);
+	wxFont *pResult = m_pCanvas->getFontFromMunkHTMLFontAttributes(font_attributes,
+								       true, // Use map
+								       characteristic_string);
 
 	if (m_CurrentFontCharacteristicString != characteristic_string) {
 		// In addition, if we aren't using the same font as last time,
@@ -9973,11 +10083,12 @@ wxFont *MunkQDHTMLHandler::CreateCurrentFont()
 		m_pDC->SetFont(*pResult);
 
 		// Then, set m_CurrentFontSpace{Width,Height,Descent}
-		String2MunkFontStringMetrics::iterator it = m_FontSpaceCache.find(characteristic_string);
-		if (it == m_FontSpaceCache.end()) {
+		String2MunkFontStringMetrics::iterator it = m_pCanvas->m_FontSpaceCache.find(characteristic_string);
+		if (it == m_pCanvas->m_FontSpaceCache.end()) {
 			m_pDC->GetTextExtent(wxT(" "), &m_CurrentFontSpaceWidth, &m_CurrentFontSpaceHeight, &m_CurrentFontSpaceDescent);
 			
-			m_FontSpaceCache.insert(std::make_pair(characteristic_string, MunkFontStringMetrics(m_CurrentFontSpaceWidth, m_CurrentFontSpaceHeight, m_CurrentFontSpaceDescent)));
+			m_pCanvas->m_FontSpaceCache.insert(std::make_pair(characteristic_string, MunkFontStringMetrics(m_CurrentFontSpaceWidth, m_CurrentFontSpaceHeight, m_CurrentFontSpaceDescent)));
+			std::cerr << "UP303.1: " << this << " characteristic_string = '" << characteristic_string << "'" << std::endl;
 		} else {
 			m_CurrentFontSpaceWidth = it->second.m_StringWidth;
 			m_CurrentFontSpaceHeight = it->second.m_StringHeight;

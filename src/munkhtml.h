@@ -27,6 +27,55 @@
 #include <llist.h>
 */
 
+
+
+
+//////////////////////////////////////////////////////////
+//
+// MunkFontStringMetrics
+//
+//////////////////////////////////////////////////////////
+
+
+
+class MunkFontStringMetrics {
+ public:
+	int m_StringWidth;
+	int m_StringHeight;
+	int m_StringDescent;
+	MunkFontStringMetrics(int StringWidth, int StringHeight, int StringDescent);
+	~MunkFontStringMetrics();
+	MunkFontStringMetrics(const MunkFontStringMetrics& other);
+	MunkFontStringMetrics& operator=(const MunkFontStringMetrics& other);
+ private:
+	void assign(const MunkFontStringMetrics& other);
+};
+
+
+typedef std::map<std::string, MunkFontStringMetrics> String2MunkFontStringMetrics;
+
+
+
+///////////////////////////////////////////////////////////////
+//
+// MunkStringMetricsCache
+//
+///////////////////////////////////////////////////////////////
+class MunkStringMetricsCache {
+protected:
+	std::map<wxString, MunkFontStringMetrics> m_String2FontStringMetricsMap;
+public:
+	MunkStringMetricsCache();
+	~MunkStringMetricsCache();
+
+	void GetTextExtent(const wxString& strInput, wxDC *pDC, wxCoord *pWidth, wxCoord *pHeight, wxCoord *pDescent);
+};
+
+typedef std::map<std::string, MunkStringMetricsCache*> CharacteristicString2MunkStringMetricsCacheMap;
+typedef std::map<std::string, wxFont*> String2PFontMap;
+
+
+
 ///////////////////////////////////////////////////////////////
 //
 // MunkException
@@ -848,7 +897,7 @@ protected:
 class MunkHtmlWordCell : public MunkHtmlCell
 {
 public:
-    MunkHtmlWordCell(const wxString& word, const wxDC& dc);
+    MunkHtmlWordCell(const wxString& word, MunkStringMetricsCache *pStringMetricsCache, wxDC *pDC);
     MunkHtmlWordCell(long SpaceWidth, long SpaceHeight, long SpaceDescent);
     virtual void Draw(wxDC& dc, int x, int y, int view_y1, int view_y2,
               MunkHtmlRenderingInfo& info);
@@ -925,7 +974,7 @@ class MunkHtmlNegativeSpaceCell : public MunkHtmlWordCell
  protected:
 	int m_pixels;
  public:
-	MunkHtmlNegativeSpaceCell(int pixels, const wxDC& dc);
+	MunkHtmlNegativeSpaceCell(int pixels, MunkStringMetricsCache *pStringMetricsCache, wxDC *pDC);
 	virtual void Draw(wxDC& dc, int x, int y, int view_y1, int view_y2,
 			  MunkHtmlRenderingInfo& info);
 
@@ -1769,7 +1818,7 @@ class MunkHtmlFormContainer {
 };
 
 
-
+class MunkHtmlParsingStructure; // Forward declaration
 
 
 
@@ -1792,7 +1841,9 @@ class MunkHtmlWindow : public wxScrolledWindow,
     friend class MunkHtmlWinModule;
 
 public:
-    MunkHtmlWindow() : MunkHtmlWindowMouseHelper(this) {
+   MunkHtmlWindow()
+	   : MunkHtmlWindowMouseHelper(this),
+	     m_pParsingStructure(0) {
 	    m_bCreated = false;
 	    Init();
     }
@@ -1801,7 +1852,8 @@ public:
 		   const wxSize& size = wxDefaultSize,
 		   long style = MunkHW_DEFAULT_STYLE,
 		   const wxString& name = wxT("htmlWindow"))
-        : MunkHtmlWindowMouseHelper(this)
+	    : MunkHtmlWindowMouseHelper(this),
+	      m_pParsingStructure(0)
     {
 	    m_bCreated = false; 
 	    Init();
@@ -2038,6 +2090,9 @@ public:
 
  protected:
     wxString m_strPageSource; // The source of the current page.
+
+    MunkHtmlParsingStructure *m_pParsingStructure;
+	
 
     // This is pointer to the first cell in parsed data.  (Note: the first cell
     // is usually top one = all other cells are sub-cells of this one)
@@ -2337,18 +2392,14 @@ private:
 
 
 
-//////////////////////////////////////////////////////////
-//
-// MunkQDHTMLHandler
-//
-//////////////////////////////////////////////////////////
-
-
 class MunkHtmlParsingStructure {
  public:
 	MunkHtmlParsingStructure(MunkHtmlWindow *pParent);
 	virtual ~MunkHtmlParsingStructure();
 
+	virtual void ChangeMagnification(int nNewMagnification);
+	int GetMagnification() const { return m_nMagnification; };
+	
 	// We do not own the FS
 	virtual wxFileSystem *GetFS() { return m_pFS; };
 	virtual void SetFS(wxFileSystem *pFS) { m_pFS = pFS; };
@@ -2370,6 +2421,17 @@ class MunkHtmlParsingStructure {
 
 	virtual bool Parse(const wxString& text, int nMagnification, std::string& error_message);
 
+	virtual void clear();
+
+	String2PFontMap m_HTML_font_map;
+	String2MunkFontStringMetrics m_FontSpaceCache; // Font characteristic string to MunkFontStringMetrics, currently only used for the string wxT(" ")
+	CharacteristicString2MunkStringMetricsCacheMap m_MunkStringMetricsCacheCache;
+	MunkStringMetricsCache *getMunkStringMetricsCache(const std::string& font_characteristic_string);
+protected:
+	void clearMunkStringMetricsCacheCache();	
+public:
+
+	virtual wxFont *getFontFromMunkHTMLFontAttributes(const MunkHTMLFontAttributes& font_attributes, bool bUseCacheMap, const std::string& characteristic_string);
 
  protected:
 	// This is pointer to the first cell in parsed data.  (Note: the first cell
@@ -2389,6 +2451,7 @@ class MunkHtmlParsingStructure {
 	wxColour m_backgroundColour;
 	double m_dblPixel_scale;
 	MunkHtmlWindow *m_pParentMunkHtmlWindow;
+	int m_nMagnification;
 };
 
 
@@ -2398,20 +2461,12 @@ enum eAnchorType {
 };
 
 
-class MunkFontStringMetrics {
- public:
-	long m_StringWidth;
-	long m_StringHeight;
-	long m_StringDescent;
-	MunkFontStringMetrics(long StringWidth, long StringHeight, long StringDescent);
-	~MunkFontStringMetrics();
-	MunkFontStringMetrics(const MunkFontStringMetrics& other);
-	MunkFontStringMetrics& operator=(const MunkFontStringMetrics& other);
- private:
-	void assign(const MunkFontStringMetrics& other);
-};
+//////////////////////////////////////////////////////////
+//
+// MunkQDHTMLHandler
+//
+//////////////////////////////////////////////////////////
 
-typedef std::map<std::string, MunkFontStringMetrics> String2MunkFontStringMetrics;
 
 class MunkQDHTMLHandler : public MunkQDDocHandler {
 	static wxRegEx m_regex_space_newline_space;
@@ -2443,10 +2498,6 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 	SmallCapsStack m_smallcaps_stack;
 	MunkFontAttributeStack m_HTML_font_attribute_stack;
 	long m_Align;
-	typedef std::map<std::string, wxFont*> String2PFontMap;
-	String2PFontMap m_HTML_font_map;
-	String2MunkFontStringMetrics m_FontSpaceCache; // Font characteristic string to MunkFontStringMetrics, currently only used for the string wxT(" ")
-	int m_nMagnification;
 	bool m_tmpLastWasSpace;
 	wxChar *m_tmpStrBuf;
 	size_t  m_tmpStrBufSize;
@@ -2478,7 +2529,7 @@ class MunkQDHTMLHandler : public MunkQDDocHandler {
 
 	std::stack<eWhiteSpaceKind> m_white_space_stack;
  public:
-	MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas, int nMagnification);
+	MunkQDHTMLHandler(MunkHtmlParsingStructure *pCanvas);
 	virtual ~MunkQDHTMLHandler();
 	virtual void startElement(const std::string& tag, const MunkAttributeMap& attrs);
 	virtual void endElement(const std::string& tag);
