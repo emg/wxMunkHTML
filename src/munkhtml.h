@@ -1845,18 +1845,19 @@ public:
 	   : MunkHtmlWindowMouseHelper(this),
 	     m_pParsingStructure(0) {
 	    m_bCreated = false;
-	    Init();
+	    Init(100);
     }
     MunkHtmlWindow(wxWindow *parent, wxWindowID id = wxID_ANY,
 		   const wxPoint& pos = wxDefaultPosition,
 		   const wxSize& size = wxDefaultSize,
 		   long style = MunkHW_DEFAULT_STYLE,
-		   const wxString& name = wxT("htmlWindow"))
+		   const wxString& name = wxT("htmlWindow"),
+		   int nInitialMagnification = 100)
 	    : MunkHtmlWindowMouseHelper(this),
 	      m_pParsingStructure(0)
     {
 	    m_bCreated = false; 
-	    Init();
+	    Init(nInitialMagnification);
 	    Create(parent, id, pos, size, style, name);
     }
     virtual ~MunkHtmlWindow();
@@ -1974,7 +1975,7 @@ public:
     static wxCursor GetDefaultHTMLCursor(HTMLCursor type);
 
 protected:
-    void Init();
+    void Init(int nInitialMagnification);
 
  public:
     // Scrolls to anchor of this name. (Anchor is #news
@@ -2082,6 +2083,7 @@ public:
     virtual wxCursor GetHTMLCursor(HTMLCursor type) const;
 
     virtual bool ChangeMagnification(int nNewMagnification, std::string& error_message);
+    virtual int GetMagnification() { return m_nMagnification; };
 
     // implementation of SetPage()
     bool DoSetPage(const wxString& source, std::string& error_message);

@@ -1047,7 +1047,7 @@ MunkHtmlParsingStructure::MunkHtmlParsingStructure(MunkHtmlWindow *pParent)
 	m_pFS = 0;
 	m_pDC = 0;
 	m_pForms = 0;
-	m_nMagnification = 100;
+	m_nMagnification = pParent->GetMagnification();
 }
 
 
@@ -5490,10 +5490,10 @@ void MunkHtmlWindow::CleanUpStatics()
     wxDELETE(ms_cursorText);
 }
 
-void MunkHtmlWindow::Init()
+void MunkHtmlWindow::Init(int nInitialMagnification)
 {
     m_bDoSetPageInWindowCreateEventHandle = false;
-    m_nMagnification = 100;
+    m_nMagnification = nInitialMagnification;
     m_tmpCanDrawLocks = 0;
     m_FS = new wxFileSystem();
 #if wxUSE_STATUSBAR
