@@ -27,6 +27,14 @@
 #include <llist.h>
 */
 
+#include "wx/defs.h"
+#include "wx/brush.h"
+#include "wx/radiobox.h"
+#include "wx/button.h"
+#include "wx/combobox.h"
+#include "wx/panel.h"
+#include "wx/regex.h"
+
 
 
 
@@ -274,13 +282,6 @@ class MunkQDParser {
 
 
 
-#include "wx/defs.h"
-#include "wx/brush.h"
-#include "wx/radiobox.h"
-#include "wx/button.h"
-#include "wx/combobox.h"
-#include "wx/panel.h"
-#include "wx/regex.h"
 
 
 
@@ -1443,8 +1444,10 @@ class MunkHtmlCellsIterator {
 /////////////////////////////////////////////////////////////////////////////
 
 
+#include "wx/string.h"
 #include "wx/scrolwin.h"
 #include "wx/config.h"
+#include "wx/font.h"
 #include "wx/stopwatch.h"
 #include "wx/filesys.h"
 #include "wx/filename.h"
