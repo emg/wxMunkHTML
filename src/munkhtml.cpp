@@ -10088,7 +10088,6 @@ wxFont *MunkQDHTMLHandler::CreateCurrentFont()
 			m_pDC->GetTextExtent(wxT(" "), &m_CurrentFontSpaceWidth, &m_CurrentFontSpaceHeight, &m_CurrentFontSpaceDescent);
 			
 			m_pCanvas->m_FontSpaceCache.insert(std::make_pair(characteristic_string, MunkFontStringMetrics(m_CurrentFontSpaceWidth, m_CurrentFontSpaceHeight, m_CurrentFontSpaceDescent)));
-			std::cerr << "UP303.1: " << this << " characteristic_string = '" << characteristic_string << "'" << std::endl;
 		} else {
 			m_CurrentFontSpaceWidth = it->second.m_StringWidth;
 			m_CurrentFontSpaceHeight = it->second.m_StringHeight;
