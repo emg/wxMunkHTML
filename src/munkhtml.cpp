@@ -7027,7 +7027,7 @@ MunkHtmlTableCell::MunkHtmlTableCell(MunkHtmlContainerCell *parent, const MunkHt
 	    } 
     }
     m_ColsInfo = NULL;
-    m_NumCols = m_NumRows = 0;
+    m_NumCols = m_NumRows = m_NumAllocatedRows = 0;
     m_CellInfo = NULL;
     m_ActualCol = m_ActualRow = -1;
 
@@ -7104,8 +7104,24 @@ void MunkHtmlTableCell::ReallocCols(int cols)
 
 void MunkHtmlTableCell::ReallocRows(int rows)
 {
-    m_CellInfo = (cellStruct**) realloc(m_CellInfo, sizeof(cellStruct*) * rows);
-    for (int row = m_NumRows; row < rows ; row++)
+    int alloc_rows;
+    for (alloc_rows = m_NumAllocatedRows; alloc_rows < rows;)
+    {
+        if (alloc_rows < 4)
+            alloc_rows = 4;
+        else if (alloc_rows < 4096)
+            alloc_rows <<= 1;
+        else
+            alloc_rows += 2048;
+    }
+
+    if (alloc_rows > m_NumAllocatedRows)
+    {
+        m_CellInfo = (cellStruct**) realloc(m_CellInfo, sizeof(cellStruct*) * alloc_rows);
+        m_NumAllocatedRows = alloc_rows;
+    }
+
+    for (int row = m_NumRows; row < rows ; ++row)
     {
         if (m_NumCols == 0)
             m_CellInfo[row] = NULL;
@@ -7171,6 +7187,13 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
 
     /* scan for parameters: */
 
+    // id:
+    wxString idvalue = tag.GetParam(wxT("ID"));
+    if (!idvalue.IsEmpty()) 
+    {
+        cell->SetId(idvalue);
+    }
+
     // width:
     {
         if (tag.HasParam(wxT("WIDTH")))
@@ -7199,6 +7222,12 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
 			    // itself know, too, what its width is.
 			    cell->SetWidthFloat(m_ColsInfo[c].width, m_ColsInfo[c].units);
 		    }
+	    } else {
+		    // We did not have a width.
+		    // Set default parameters.
+		    m_ColsInfo[c].width = 0;
+		    m_ColsInfo[c].units = MunkHTML_UNITS_PERCENT;
+		    cell->SetWidthFloat(100, MunkHTML_UNITS_PERCENT);
 	    }
 	}
     }
@@ -7273,10 +7302,15 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
 
     cell->SetIndent(m_Padding, MunkHTML_INDENT_ALL, MunkHTML_UNITS_PIXELS);
 }
+    
 
 void MunkHtmlTableCell::ComputeMinMaxWidths()
 {
-    if (m_NumCols == 0 || m_ColsInfo[0].minWidth != wxDefaultCoord) return;
+	std::cerr << "UP230: " << this << " m_NumCols = " << m_NumCols << " m_ColsInfo[0].minWidth = " << m_ColsInfo[0].minWidth << std::endl;
+
+	if (m_NumCols == 0 || m_ColsInfo[0].minWidth != wxDefaultCoord) return;
+
+    std::cerr << "UP231: " << this << std::endl;
 
     m_MaxTotalWidth = 0;
     int percentage = 0;
@@ -7312,6 +7346,8 @@ void MunkHtmlTableCell::ComputeMinMaxWidths()
             m_MaxTotalWidth += m_ColsInfo[c].maxWidth;
     }
 
+    // Commented out by USP on 2019-07-11. What is the point of this?
+    /*
     if (percentage >= 100)
     {
         // Table would have infinite length
@@ -7320,8 +7356,12 @@ void MunkHtmlTableCell::ComputeMinMaxWidths()
     }
     else
         m_MaxTotalWidth = m_MaxTotalWidth * 100 / (100 - percentage);
+    */
 
-    m_MaxTotalWidth += (m_NumCols + 1) * m_Spacing;
+    m_MaxTotalWidth += (m_NumCols + 1) * m_Spacing  +  m_BorderWidthRight + m_BorderWidthLeft;
+
+    std::cerr << "UP232: " << this << " m_MaxTotalWidth = " << m_MaxTotalWidth << std::endl;
+    
 }
 
 void MunkHtmlTableCell::Layout(int w)
