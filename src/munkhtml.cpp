@@ -7306,11 +7306,8 @@ void MunkHtmlTableCell::AddCell(MunkHtmlContainerCell *cell, const MunkHtmlTag& 
 
 void MunkHtmlTableCell::ComputeMinMaxWidths()
 {
-	std::cerr << "UP230: " << this << " m_NumCols = " << m_NumCols << " m_ColsInfo[0].minWidth = " << m_ColsInfo[0].minWidth << std::endl;
+    if (m_NumCols == 0 || m_ColsInfo[0].minWidth != wxDefaultCoord) return;
 
-	if (m_NumCols == 0 || m_ColsInfo[0].minWidth != wxDefaultCoord) return;
-
-    std::cerr << "UP231: " << this << std::endl;
 
     m_MaxTotalWidth = 0;
     int percentage = 0;
@@ -7359,9 +7356,6 @@ void MunkHtmlTableCell::ComputeMinMaxWidths()
     */
 
     m_MaxTotalWidth += (m_NumCols + 1) * m_Spacing  +  m_BorderWidthRight + m_BorderWidthLeft;
-
-    std::cerr << "UP232: " << this << " m_MaxTotalWidth = " << m_MaxTotalWidth << std::endl;
-    
 }
 
 void MunkHtmlTableCell::Layout(int w)
